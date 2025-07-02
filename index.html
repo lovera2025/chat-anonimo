@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ayuda Anónima</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        /* Estilos personalizados para el scrollbar */
+        #chat-box {
+            max-height: 400px; /* Altura máxima para el área de chat */
+            overflow-y: auto; /* Habilitar scroll vertical */
+            display: flex; /* Usar flexbox para que los mensajes se apilen correctamente */
+            flex-direction: column; /* Apilar mensajes verticalmente */
+        }
+        /* Estilo para el scrollbar en navegadores Webkit (Chrome, Safari) */
+        #chat-box::-webkit-scrollbar {
+            width: 8px;
+        }
+        #chat-box::-webkit-scrollbar-track {
+            background: #1a202c; /* Fondo oscuro */
+            border-radius: 10px;
+        }
+        #chat-box::-webkit-scrollbar-thumb {
+            background: #4a5568; /* Color de la barra de scroll */
+            border-radius: 10px;
+        }
+        #chat-box::-webkit-scrollbar-thumb:hover {
+            background: #718096; /* Color al pasar el mouse */
+        }
+
+        /* Asegurar que el cuerpo use el 100% del viewport height */
+        body {
+            min-height: 100vh;
+            font-family: "Inter", sans-serif; /* Usar fuente Inter */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 flex items-center justify-center p-4">
+
+    <div class="container mx-auto max-w-lg bg-gray-800 rounded-lg shadow-xl p-6">
+        <h1 class="text-2xl font-bold text-center mb-6 text-teal-400">Ayuda Anónima</h1>
+
+        <div id="chat-box" class="border border-gray-700 rounded-lg p-4 mb-4 bg-gray-700">
+            </div>
+
+        <div class="flex">
+            <input type="text" id="message-input" class="flex-grow p-3 rounded-l-lg border-t border-b border-l border-gray-700 bg-gray-600 text-gray-100 placeholder-gray-400 focus:outline-none focus:border-teal-500" placeholder="Escribe tu mensaje...">
+            <button id="send-button" class="bg-teal-500 text-white p-3 rounded-r-lg hover:bg-teal-600 focus:outline-none">Enviar</button>
+        </div>
+
+        <div class="text-center mt-6">
+             <button id="quick-exit-button" class="bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 focus:outline-none text-sm">Salida Rápida</button>
+        </div>
+    </div>
+
+    <script>
+        // Conexión real al servidor de Socket.IO
+        const socket = io();
+
+        // Script JavaScript para manejar el chat y el anonimato
+        // Crear contenedores flotantes para los mensajes predefinidos
+        const predefinedMessagesLeft = document.createElement('div');
+        predefinedMessagesLeft.classList.add('fixed', 'top-1/2', 'left-4', 'transform', '-translate-y-1/2', 'flex', 'flex-col', 'gap-2', 'z-10');
+
+        const predefinedMessagesBottom = document.createElement('div');
+        predefinedMessagesBottom.classList.add('fixed', 'bottom-4', 'left-1/2', 'transform', '-translate-x-1/2', 'flex', 'flex-col', 'gap-2', 'z-10');
+
+        const predefinedMessagesRight = document.createElement('div');
+        predefinedMessagesRight.classList.add('fixed', 'top-1/2', 'right-4', 'transform', '-translate-y-1/2', 'flex', 'flex-col', 'gap-2', 'z-10');
+
+        // Lista de mensajes predefinidos
+        const predefinedMessages = [
+            { text: "Estoy sufriendo acoso", container: predefinedMessagesLeft },
+            { text: "Sufro maltrato", container: predefinedMessagesBottom },
+            { text: "Me hacen bullying", container: predefinedMessagesRight }
+        ];
+
+        predefinedMessages.forEach(({ text, container }) => {
+            const messageButton = document.createElement('button');
+            messageButton.textContent = text;
+            messageButton.classList.add(
+            'bg-teal-500', 'text-white', 'p-3', 'rounded-lg', 'hover:bg-teal-600',
+            'focus:outline-none', 'text-sm', 'shadow-lg'
+            );
+
+            if (container === predefinedMessagesBottom) {
+                messageButton.classList.add('text-lg', 'p-4', 'bg-teal-600', 'hover:bg-teal-700');
+            }
+
+            messageButton.addEventListener('click', () => {
+                const messageData = { senderId: anonymousUserId, message: text };
+                socket.emit('chat message', messageData);
+            });
+
+            container.appendChild(messageButton);
+        });
+
+        document.body.appendChild(predefinedMessagesLeft);
+        document.body.appendChild(predefinedMessagesBottom);
+        document.body.appendChild(predefinedMessagesRight);
+        
+        const chatBox = document.getElementById('chat-box');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const quickExitButton = document.getElementById('quick-exit-button');
+
+        const anonymousUserId = 'Usuario' + Math.floor(Math.random() * 10000);
+
+        // Función para añadir un mensaje al chat (modificada para diferenciar emisor)
+        function addMessage(senderId, message) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('mb-3', 'p-3', 'rounded-lg', 'max-w-xs');
+
+            // Comprueba si el mensaje es del usuario actual, de otra persona o del sistema
+            if (senderId === anonymousUserId) {
+                messageElement.classList.add('bg-blue-600', 'text-white', 'ml-auto');
+            } else if (senderId === 'Sistema') {
+                messageElement.classList.add('bg-yellow-600', 'text-black', 'mx-auto', 'text-center', 'italic');
+            } else {
+                messageElement.classList.add('bg-gray-600', 'text-gray-100', 'mr-auto');
+            }
+
+            const strongText = senderId === 'Sistema' ? '' : `<strong class="text-xs opacity-75">${senderId}:</strong><br>`;
+            messageElement.innerHTML = `${strongText}${message}`;
+            chatBox.appendChild(messageElement);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // Función para enviar el mensaje (reutilizable)
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message) {
+                const messageData = { senderId: anonymousUserId, message: message };
+                socket.emit('chat message', messageData);
+                messageInput.value = '';
+            }
+        }
+        
+        // Evento para el botón Enviar
+        sendButton.addEventListener('click', sendMessage);
+
+        // Permitir enviar mensaje con Enter
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Escuchar los mensajes que llegan del servidor
+        socket.on('chat message', (data) => {
+            addMessage(data.senderId, data.message);
+        });
+
+        // =======================================================
+        //  NUEVO: LÓGICA PARA CONFIRMAR LA ALERTA
+        // =======================================================
+        socket.on('request-alert-confirmation', (alertData) => {
+            // Se usa el diálogo de confirmación del navegador. Es simple pero efectivo.
+            const userConfirmed = confirm(
+                "Hemos detectado que podrías estar en una situación de riesgo.\n\n" +
+                "¿Deseas notificar de forma anónima a un administrador para que pueda asistirte?\n\n" +
+                "Tu mensaje original no se enviará al chat público."
+            );
+
+            if (userConfirmed) {
+                // Si el usuario confirma, se emite el evento de vuelta al servidor.
+                socket.emit('alert-confirmed', alertData);
+                
+                // Se muestra un mensaje de confirmación al usuario que envió la alerta.
+                addMessage('Sistema', 'Se ha enviado una alerta a un administrador. Estamos contigo.');
+            } else {
+                // Si el usuario cancela, se le informa que el mensaje no se envió.
+                addMessage('Sistema', 'Tu mensaje no fue enviado. Si estás en peligro, no dudes en usar los botones de ayuda o llamar a las líneas de emergencia.');
+            }
+        });
+
+        // El resto de tu código de UI se mantiene intacto
+        const backgroundCanvas = document.createElement('canvas');
+        backgroundCanvas.id = 'background-canvas';
+        Object.assign(backgroundCanvas.style, {
+            position: 'fixed', top: '0', left: '0', width: '100%', height: '100%', zIndex: '-1'
+        });
+        document.body.appendChild(backgroundCanvas);
+
+        const ctx = backgroundCanvas.getContext('2d');
+        let width, height;
+
+        function resizeCanvas() {
+            width = backgroundCanvas.width = window.innerWidth * window.devicePixelRatio;
+            height = backgroundCanvas.height = window.innerHeight * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const particles = Array.from({ length: 100 }, () => ({
+            x: Math.random() * width, y: Math.random() * height,
+            size: Math.random() * 3 + 1,
+            dx: Math.random() * 0.5 - 0.25, dy: Math.random() * 0.5 - 0.25,
+            opacity: Math.random() * 0.5 + 0.5
+        }));
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, width, height);
+            particles.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${p.opacity})`;
+                ctx.fill();
+                p.x += p.dx;
+                p.y += p.dy;
+                if (p.x < 0 || p.x > width) p.dx *= -1;
+                if (p.y < 0 || p.y > height) p.dy *= -1;
+            });
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+        
+        const emojiButton = document.createElement('button');
+        emojiButton.textContent = '😊';
+        emojiButton.classList.add('bg-yellow-500', 'text-white', 'p-3', 'rounded-lg', 'ml-2', 'hover:bg-yellow-600', 'focus:outline-none');
+        sendButton.parentNode.insertBefore(emojiButton, sendButton.nextSibling);
+
+        const emojiContainer = document.createElement('div');
+        emojiContainer.classList.add('absolute', 'bg-gray-800', 'p-3', 'rounded-lg', 'shadow-lg', 'hidden', 'z-10');
+        document.body.appendChild(emojiContainer);
+
+        const emojis = ['😊', '😂', '❤️', '👍', '😢', '😡', '🎉', '🙏'];
+        emojis.forEach(emoji => {
+            const emojiOption = document.createElement('button');
+            emojiOption.textContent = emoji;
+            emojiOption.classList.add('text-xl', 'p-2', 'hover:bg-gray-700', 'rounded');
+            emojiOption.addEventListener('click', () => {
+                messageInput.value += emoji;
+                emojiContainer.style.display = 'none';
+            });
+            emojiContainer.appendChild(emojiOption);
+        });
+
+        emojiButton.addEventListener('click', (e) => {
+            const isHidden = emojiContainer.style.display === 'none' || emojiContainer.style.display === '';
+            emojiContainer.style.display = isHidden ? 'block' : 'none';
+            if (isHidden) {
+                const rect = emojiButton.getBoundingClientRect();
+                emojiContainer.style.top = `${rect.bottom + window.scrollY}px`;
+                emojiContainer.style.left = `${rect.left + window.scrollX}px`;
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!emojiContainer.contains(e.target) && e.target !== emojiButton) {
+                emojiContainer.style.display = 'none';
+            }
+        });
+
+        quickExitButton.addEventListener('click', () => {
+            window.location.href = 'https://www.google.com';
+        });
+
+        chatBox.innerHTML = `<div class="text-center text-gray-400 italic mb-3">¡Bienvenido! Estás conectado como ${anonymousUserId}.</div>`;
+
+        const header = document.createElement('div');
+        header.classList.add('absolute', 'top-4', 'left-4', 'text-sm', 'text-gray-300', 'bg-gray-800', 'p-2', 'rounded-lg', 'shadow-md');
+        header.textContent = 'Comunicate al 102 o 137 si sufris acoso, maltrato o bullying.';
+        document.body.appendChild(header);
+    </script>
+</body>
+</html>
