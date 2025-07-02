@@ -60,7 +60,7 @@ io.on('connection', (socket) => {
             to: 'maximiliano1523@gmail.com',
             from: 'maximiliano1523@gmail.com',
             
-            subject: '⚠️ ALERTA DE ABUSO EN CHAT ANÓNIMO ⚠️', // <-- CORREGIDO
+            subject: '⚠️ ALERTA DE ABUSO EN CHAT ANÓNIMO ⚠️', // <--
             html: `
                 <h1>Alerta de Riesgo Detectada</h1>
                 <p>Se ha detectado una posible situación de riesgo en el chat anónimo.</p>
