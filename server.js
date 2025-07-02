@@ -5,7 +5,7 @@ const path = require('path');
 const Sentiment = require('sentiment');
 const sgMail = require('@sendgrid/mail');
 
-const sentiment = new Sentiment();
+const sentiment = new Sentiment(); 
 
 // --- Configuración de SendGrid ---
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -28,12 +28,21 @@ io.on('connection', (socket) => {
 
     socket.on('chat message', (data) => {
         const messageText = data.message.toLowerCase();
-        const result = sentiment.analyze(messageText);
+        
+        // =======================================================
+        //  LÓGICA DE DETECCIÓN CORREGIDA
+        // =======================================================
 
-        const keywords = ['abuso', 'maltrato', 'ayudenme', 'peligro', 'socorro', 'violan', 'pegan', 'acoso', 'bullying'];
+        // 1. Lista de palabras clave ampliada con tus sugerencias.
+        const keywords = [
+            'abuso', 'abusan', 'maltrato', 'maltratan', 'ayudenme', 
+            'peligro', 'socorro', 'violan', 'pegan', 'acoso', 
+            'acosan', 'bullying', 'violencia'
+        ];
         const hasKeyword = keywords.some(word => messageText.includes(word));
 
-        if (hasKeyword && result.score < 0) {
+        // 2. Condición simplificada: ahora solo revisa si existe la palabra clave.
+        if (hasKeyword) {
             socket.emit('request-alert-confirmation', {
                 message: data.message,
                 user: data.senderId
@@ -41,19 +50,16 @@ io.on('connection', (socket) => {
         } else {
             io.emit('chat message', data);
         }
+        // =======================================================
     });
     
     socket.on('alert-confirmed', (alertData) => {
         console.log(`¡ALERTA CONFIRMADA POR ${alertData.user}! Enviando Email con SendGrid...`);
         
         const msg = {
-            // El email que RECIBE la alerta.
-            to: 'maximiliano1523@gmail.com', // <-- CORREGIDO
-            
-            // El email que ENVÍA la alerta (DEBE ser el que verificaste en SendGrid).
-            from: 'maximiliano1523@gmail.com', // <-- CORREGIDO
-            
-            subject: '⚠️ ALERTA DE ABUSO EN CHAT ANÓNIMO ⚠️',
+            to: 'maximiliano1523@gmail.com',
+            from: 'maximiliano1523@gmail.com',
+            subject: ⚠️ ALERTA DE ABUSO EN CHAT ANÓNIMO ⚠️',
             html: `
                 <h1>Alerta de Riesgo Detectada</h1>
                 <p>Se ha detectado una posible situación de riesgo en el chat anónimo.</p>
