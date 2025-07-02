@@ -92,6 +92,7 @@
             messageButton.addEventListener('click', () => {
                 const messageData = { senderId: anonymousUserId, message: text };
                 socket.emit('chat message', messageData);
+                addMessage(anonymousUserId, text); // Muestra el mensaje predefinido al instante
             });
 
             container.appendChild(messageButton);
@@ -134,6 +135,7 @@
             if (message) {
                 const messageData = { senderId: anonymousUserId, message: message };
                 socket.emit('chat message', messageData);
+                addMessage(anonymousUserId, message); // <-- LÍNEA AÑADIDA
                 messageInput.value = '';
             }
         }
@@ -150,11 +152,14 @@
 
         // Escuchar los mensajes que llegan del servidor
         socket.on('chat message', (data) => {
-            addMessage(data.senderId, data.message);
+            // Evita duplicar el mensaje si es del propio usuario
+            if (data.senderId !== anonymousUserId) {
+                addMessage(data.senderId, data.message);
+            }
         });
 
         // =======================================================
-        //  NUEVO: LÓGICA PARA CONFIRMAR LA ALERTA
+        //  LÓGICA PARA CONFIRMAR LA ALERTA
         // =======================================================
         socket.on('request-alert-confirmation', (alertData) => {
             // Se usa el diálogo de confirmación del navegador. Es simple pero efectivo.
