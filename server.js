@@ -30,24 +30,32 @@ io.on('connection', (socket) => {
         const messageText = data.message.toLowerCase();
         
         // =======================================================
-        //  LÓGICA DE DETECCIÓN CORREGIDA
+        //  ALGORITMO DE DETECCIÓN MEJORADO
         // =======================================================
 
-        // 1. Lista de palabras clave ampliada.
-        const keywords = [
-            'abuso', 'abusan', 'maltrato', 'maltratan', 'ayudenme', 
-            'peligro', 'socorro', 'violan', 'pegan', 'acoso', 
-            'acosan', 'bullying', 'violencia'
-        ];
-        const hasKeyword = keywords.some(word => messageText.includes(word));
+        // Listas de palabras para el algoritmo
+        const riskKeywords = ['abuso', 'abusan', 'maltrato', 'maltratan', 'peligro', 'violan', 'pegan', 'acoso', 'acosan', 'bullying', 'violencia'];
+        const contextKeywords = ['sufro', 'sufriendo', 'estoy', 'me', 'ayuda', 'necesito', 'auxilio', 'socorro', 'ayudenme'];
+        const negationKeywords = ['no', 'nunca', 'jamas', 'tampoco', 'nadie'];
 
-        // 2. Condición simplificada: ahora solo revisa si existe la palabra clave.
-        if (hasKeyword) {
+        // Aplicamos los filtros
+        const hasRiskWord = riskKeywords.some(word => messageText.includes(word));
+        const hasContextWord = contextKeywords.some(word => messageText.includes(word));
+        const hasNegation = negationKeywords.some(word => messageText.includes(word));
+        const sentimentResult = sentiment.analyze(messageText);
+
+        // Condición mejorada:
+        // 1. No debe tener negaciones.
+        // 2. Debe tener una palabra de riesgo.
+        // 3. Debe tener una palabra de contexto personal.
+        // 4. (Opcional pero recomendado) El sentimiento debe ser negativo.
+        if (!hasNegation && hasRiskWord && hasContextWord && sentimentResult.score < 0) {
             socket.emit('request-alert-confirmation', {
                 message: data.message,
                 user: data.senderId
             });
         } else {
+            // Si no cumple las condiciones de alerta, se envía el mensaje normalmente.
             io.emit('chat message', data);
         }
         // =======================================================
@@ -59,8 +67,7 @@ io.on('connection', (socket) => {
         const msg = {
             to: 'maximiliano1523@gmail.com',
             from: 'maximiliano1523@gmail.com',
-            
-            subject: '⚠️ ALERTA DE ABUSO EN CHAT ANÓNIMO ⚠️', // <--
+            subject: '⚠️ ALERTA DE ABUSO EN CHAT ANÓNIMO ⚠️',
             html: `
                 <h1>Alerta de Riesgo Detectada</h1>
                 <p>Se ha detectado una posible situación de riesgo en el chat anónimo.</p>
@@ -90,4 +97,3 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
     console.log(`Servidor escuchando en el puerto ${PORT}`);
 });
-
