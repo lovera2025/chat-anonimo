@@ -1,22 +1,14 @@
 const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
-const path = require('path');
+const path =require('path');
 const Sentiment = require('sentiment');
-const twilio = require('twilio');
+const sgMail = require('@sendgrid/mail'); // Se usa la librería de SendGrid
 
-// --- Configuración de Twilio y Sentiment ---
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
-const twilioClient = new twilio(accountSid, authToken);
-const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
-
-// Se leen ambos números desde las variables de entorno
-const myPhoneNumber = process.env.MY_PHONE_NUMBER;
-const friendPhoneNumber = process.env.FRIEND_PHONE_NUMBER; // <-- NUEVO
-
-const sentiment = new Sentiment();
-// ---------------------------------------------
+// --- Configuración de SendGrid ---
+// Se establece la API Key desde las Variables de Entorno de Render
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+// ----------------------------------
 
 const app = express();
 const server = http.createServer(app);
@@ -50,29 +42,39 @@ io.on('connection', (socket) => {
         }
     });
     
+    // --- LÓGICA PARA ENVIAR CORREO CON SENDGRID ---
     socket.on('alert-confirmed', (alertData) => {
-        console.log(`¡ALERTA CONFIRMADA POR ${alertData.user}! Enviando SMS a los destinatarios...`);
+        console.log(`¡ALERTA CONFIRMADA POR ${alertData.user}! Enviando Email con SendGrid...`);
         
-        const alertMessageBody = `ALERTA DE ABUSO EN CHAT ANÓNIMO:\nUsuario: ${alertData.user}\nMensaje: "${alertData.message}"\nPor favor, revisa la situación.`;
+        const msg = {
+            // IMPORTANTE: Cambia esta línea por el email donde quieres RECIBIR la alerta.
+            to: 'maximiliano1523@gmail.com', 
+            
+            // IMPORTANTE: Cambia esta línea por el email que VERIFICASTE en SendGrid.
+            from: 'maximiliano1523@gmail.com', 
+            
+            subject: '⚠️ ALERTA DE ABUSO EN CHAT ANÓNIMO ⚠️',
+            html: `
+                <h1>Alerta de Riesgo Detectada</h1>
+                <p>Se ha detectado una posible situación de riesgo en el chat anónimo.</p>
+                <ul>
+                    <li><strong>Usuario Anónimo:</strong> ${alertData.user}</li>
+                    <li><strong>Mensaje:</strong> "${alertData.message}"</li>
+                </ul>
+                <p>Por favor, revisa la situación.</p>
+            `
+        };
 
-        // --- LÓGICA MODIFICADA PARA ENVIAR A MÚLTIPLES NÚMEROS ---
-        const numbersToSendTo = [myPhoneNumber, friendPhoneNumber]; // Se crea una lista con los números
-
-        // Se recorre la lista y se envía un SMS a cada número que exista
-        numbersToSendTo.forEach(number => {
-            if (number) { // Se asegura de que la variable de entorno exista antes de enviar
-                twilioClient.messages
-                    .create({
-                        body: alertMessageBody,
-                        from: twilioPhoneNumber,
-                        to: number // Se usa el número actual de la lista
-                    })
-                    .then(message => console.log(`SMS de alerta enviado a ${number} con SID:`, message.sid))
-                    .catch(err => console.error(`Error al enviar SMS a ${number}:`, err));
-            }
-        });
-        // --- FIN DE LA LÓGICA MODIFICADA ---
+        sgMail
+            .send(msg)
+            .then(() => {
+                console.log('Email de alerta enviado con éxito.');
+            })
+            .catch((error) => {
+                console.error('Error al enviar el email con SendGrid:', error.response.body);
+            });
     });
+    // --- FIN DE LA LÓGICA ---
 
     socket.on('disconnect', () => {
         console.log(`Un usuario se ha desconectado: ${socket.id}`);
