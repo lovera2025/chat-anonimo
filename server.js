@@ -52,10 +52,10 @@ io.on('connection', (socket) => {
             // =================================================================
             
             // El email que RECIBE la alerta.
-            to: 'maximiliano1523@gmail.com', 
+            to: 'maximilianolovera1523@gmail.com', 
             
-            // El email que ENVÍA la alerta (DEBE ser el que verifico en SendGrid).
-            from: 'maximiliano1523@gmail.com', 
+            // El email que ENVÍA la alerta (DEBE ser el que verificaste en SendGrid).
+            from: 'maximilianolovera1523@gmail.com', 
             
             // =================================================================
 
