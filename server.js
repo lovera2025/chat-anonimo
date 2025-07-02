@@ -5,6 +5,8 @@ const path = require('path');
 const Sentiment = require('sentiment');
 const sgMail = require('@sendgrid/mail'); // Se usa la librería de SendGrid
 
+const sentiment = new Sentiment(); // <-- LÍNEA CORREGIDA QUE FALTABA
+
 // --- Configuración de SendGrid ---
 // Se establece la API Key desde las Variables de Entorno de Render
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -47,18 +49,12 @@ io.on('connection', (socket) => {
         console.log(`¡ALERTA CONFIRMADA POR ${alertData.user}! Enviando Email con SendGrid...`);
         
         const msg = {
-            // =================================================================
-            //  ¡IMPORTANTE! USA TUS CORREOS REALES AQUÍ
-            // =================================================================
-            
             // El email que RECIBE la alerta.
             to: 'maximilianolovera1523@gmail.com', 
             
             // El email que ENVÍA la alerta (DEBE ser el que verificaste en SendGrid).
             from: 'maximilianolovera1523@gmail.com', 
             
-            // =================================================================
-
             subject: '⚠️ ALERTA DE ABUSO EN CHAT ANÓNIMO ⚠️',
             html: `
                 <h1>Alerta de Riesgo Detectada</h1>
