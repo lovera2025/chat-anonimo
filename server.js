@@ -59,7 +59,7 @@ io.on('connection', (socket) => {
         const msg = {
             to: 'maximiliano1523@gmail.com',
             from: 'maximiliano1523@gmail.com',
-            // La línea del 'subject' ahora tiene comillas al principio y al final.
+            
             subject: '⚠️ ALERTA DE ABUSO EN CHAT ANÓNIMO ⚠️', // <-- CORREGIDO
             html: `
                 <h1>Alerta de Riesgo Detectada</h1>
@@ -91,4 +91,3 @@ server.listen(PORT, () => {
     console.log(`Servidor escuchando en el puerto ${PORT}`);
 });
 
-// La llave extra '}' del final fue eliminada.
