@@ -3,12 +3,11 @@ const http = require('http');
 const socketIO = require('socket.io');
 const path = require('path');
 const Sentiment = require('sentiment');
-const sgMail = require('@sendgrid/mail'); // Se usa la librería de SendGrid
+const sgMail = require('@sendgrid/mail');
 
-const sentiment = new Sentiment(); // <-- LÍNEA CORREGIDA QUE FALTABA
+const sentiment = new Sentiment();
 
 // --- Configuración de SendGrid ---
-// Se establece la API Key desde las Variables de Entorno de Render
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 // ----------------------------------
 
@@ -44,16 +43,15 @@ io.on('connection', (socket) => {
         }
     });
     
-    // --- LÓGICA PARA ENVIAR CORREO CON SENDGRID ---
     socket.on('alert-confirmed', (alertData) => {
         console.log(`¡ALERTA CONFIRMADA POR ${alertData.user}! Enviando Email con SendGrid...`);
         
         const msg = {
             // El email que RECIBE la alerta.
-            to: 'maximilianolovera1523@gmail.com', 
+            to: 'maximiliano1523@gmail.com', // <-- CORREGIDO
             
             // El email que ENVÍA la alerta (DEBE ser el que verificaste en SendGrid).
-            from: 'maximilianolovera1523@gmail.com', 
+            from: 'maximiliano1523@gmail.com', // <-- CORREGIDO
             
             subject: '⚠️ ALERTA DE ABUSO EN CHAT ANÓNIMO ⚠️',
             html: `
@@ -76,7 +74,6 @@ io.on('connection', (socket) => {
                 console.error('Error al enviar el email con SendGrid:', error.response.body);
             });
     });
-    // --- FIN DE LA LÓGICA ---
 
     socket.on('disconnect', () => {
         console.log(`Un usuario se ha desconectado: ${socket.id}`);
