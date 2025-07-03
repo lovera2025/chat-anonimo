@@ -7,26 +7,16 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        #content-box, #chat-box {
+        #content-box {
             max-height: 400px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
         }
-        #content-box::-webkit-scrollbar, #chat-box::-webkit-scrollbar {
-            width: 8px;
-        }
-        #content-box::-webkit-scrollbar-track, #chat-box::-webkit-scrollbar-track {
-            background: #1a202c;
-            border-radius: 10px;
-        }
-        #content-box::-webkit-scrollbar-thumb, #chat-box::-webkit-scrollbar-thumb {
-            background: #4a5568;
-            border-radius: 10px;
-        }
-        #content-box::-webkit-scrollbar-thumb:hover, #chat-box::-webkit-scrollbar-thumb:hover {
-            background: #718096;
-        }
+        #content-box::-webkit-scrollbar { width: 8px; }
+        #content-box::-webkit-scrollbar-track { background: #1a202c; border-radius: 10px; }
+        #content-box::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 10px; }
+        #content-box::-webkit-scrollbar-thumb:hover { background: #718096; }
         body {
             min-height: 100vh;
             font-family: "Inter", sans-serif;
@@ -44,7 +34,7 @@
             <input type="text" id="message-input" class="flex-grow p-3 rounded-l-lg bg-gray-600 text-white focus:outline-none" placeholder="Escribe tu mensaje...">
             <button id="send-button" class="bg-teal-500 text-white p-3 rounded-r-lg">Enviar</button>
         </div>
-        
+
         <div id="footer-buttons" class="text-center mt-6">
              <button id="quick-exit-button" class="bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 focus:outline-none text-sm">Salida Rápida</button>
         </div>
@@ -68,7 +58,7 @@
         let isAdmin = false;
 
         // =======================================================
-        //  INICIO: Lógica de Elementos de UI Adicionales
+        //  INICIO: REINTEGRACIÓN DE FUNCIONALIDADES VISUALES
         // =======================================================
 
         // --- Botones Predefinidos ---
@@ -134,16 +124,64 @@
             }
         });
 
+        document.addEventListener('click', (e) => {
+            if (!emojiContainer.contains(e.target) && e.target !== emojiButton) {
+                emojiContainer.style.display = 'none';
+            }
+        });
+
         // --- Header y Salida Rápida ---
         quickExitButton.addEventListener('click', () => { window.location.href = 'https://www.google.com'; });
         const header = document.createElement('div');
         header.classList.add('absolute', 'top-4', 'left-4', 'text-sm', 'text-gray-300', 'bg-gray-800', 'p-2', 'rounded-lg', 'shadow-md');
         header.textContent = 'Comunicate al 102 o 137 si sufris acoso, maltrato o bullying.';
         document.body.appendChild(header);
-        
+
+        // --- Fondo de Partículas ---
+        const backgroundCanvas = document.createElement('canvas');
+        backgroundCanvas.id = 'background-canvas';
+        Object.assign(backgroundCanvas.style, { position: 'fixed', top: '0', left: '0', width: '100%', height: '100%', zIndex: '-1' });
+        document.body.insertBefore(backgroundCanvas, document.body.firstChild);
+        const ctx = backgroundCanvas.getContext('2d');
+        let width, height;
+        const particles = [];
+
+        function resizeCanvas() {
+            width = backgroundCanvas.width = window.innerWidth;
+            height = backgroundCanvas.height = window.innerHeight;
+            particles.length = 0;
+            for(let i=0; i<100; i++) {
+                particles.push({
+                    x: Math.random() * width, y: Math.random() * height,
+                    size: Math.random() * 3 + 1,
+                    dx: Math.random() * 0.5 - 0.25, dy: Math.random() * 0.5 - 0.25,
+                    opacity: Math.random() * 0.5 + 0.2
+                });
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, width, height);
+            particles.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${p.opacity})`;
+                ctx.fill();
+                p.x += p.dx;
+                p.y += p.dy;
+                if (p.x < 0 || p.x > width) p.dx *= -1;
+                if (p.y < 0 || p.y > height) p.dy *= -1;
+            });
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+
         // =======================================================
         //  FIN: Lógica de Elementos de UI Adicionales
         // =======================================================
+
 
         // --- Lógica Principal de la Aplicación ---
         socket.on('connect', () => {
@@ -151,8 +189,8 @@
         });
 
         const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('adminKey') === 'gg_proyecto') { 
-            socket.emit('admin-connect', 'gg_proyecto');
+        if (urlParams.get('adminKey') === 'tu_clave_secreta_123') { 
+            socket.emit('admin-connect', 'tu_clave_secreta_123');
         } else {
             showPublicChat();
         }
@@ -168,9 +206,11 @@
             isAdmin = true;
             anonymousUserId = 'ADMINISTRADOR';
             mainTitle.textContent = 'Historial de Alertas Pendientes';
+            // Ocultamos todos los elementos extra en la vista de admin
             inputArea.style.display = 'none';
             footerButtons.style.display = 'none';
             header.style.display = 'none';
+            emojiButton.style.display = 'none';
             [predefinedMessagesLeft, predefinedMessagesBottom, predefinedMessagesRight].forEach(el => el.style.display = 'none');
             
             contentBox.innerHTML = '<div class="text-yellow-400">Cargando historial...</div>';
