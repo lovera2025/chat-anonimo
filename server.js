@@ -24,7 +24,7 @@ const server = http.createServer(app);
 const io = socketIO(server);
 
 const PORT = process.env.PORT || 3000;
-const ADMIN_KEY = "tu_clave_secreta_123"; // Cambia esto por una clave más segura
+const ADMIN_KEY = "gg_proyecto"; // Cambia esto por una clave más segura
 
 let liveUsers = {}; // Mapa para rastrear usuarios en vivo { userId: socket.id }
 let adminSocketId = null; // Guardará el socket del admin
