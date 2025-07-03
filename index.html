@@ -61,18 +61,14 @@
 
         // Script JavaScript para manejar el chat y el anonimato
         const predefinedMessagesLeft = document.createElement('div');
-        // CAMBIO 2: Se añaden las clases 'hidden' y 'md:flex' para ocultar en móvil y mostrar en pantallas medianas/grandes
         predefinedMessagesLeft.classList.add('hidden', 'md:flex', 'fixed', 'top-1/2', 'left-4', 'transform', '-translate-y-1/2', 'flex-col', 'gap-2', 'z-10');
 
         const predefinedMessagesBottom = document.createElement('div');
-        // Se oculta también el botón inferior en móvil para dar más espacio
         predefinedMessagesBottom.classList.add('hidden', 'md:flex', 'fixed', 'bottom-4', 'left-1/2', 'transform', '-translate-x-1/2', 'flex-col', 'gap-2', 'z-10');
 
         const predefinedMessagesRight = document.createElement('div');
-        // CAMBIO 2: Se añaden las clases 'hidden' y 'md:flex'
         predefinedMessagesRight.classList.add('hidden', 'md:flex', 'fixed', 'top-1/2', 'right-4', 'transform', '-translate-y-1/2', 'flex-col', 'gap-2', 'z-10');
 
-        // Lista de mensajes predefinidos
         const predefinedMessages = [
             { text: "Estoy sufriendo acoso", container: predefinedMessagesLeft },
             { text: "Sufro maltrato", container: predefinedMessagesBottom },
@@ -227,16 +223,21 @@
                 messageInput.value += emoji;
                 emojiContainer.style.display = 'none';
             });
-            emojiContainer.appendChild(emojiOption);
+            emojiContainer.appendChild(emojiContainer);
         });
 
+        // =======================================================
+        //  LÓGICA CORREGIDA PARA EL PANEL DE EMOJIS
+        // =======================================================
         emojiButton.addEventListener('click', (e) => {
             const isHidden = emojiContainer.style.display === 'none' || emojiContainer.style.display === '';
             emojiContainer.style.display = isHidden ? 'block' : 'none';
             if (isHidden) {
                 const rect = emojiButton.getBoundingClientRect();
                 emojiContainer.style.top = `${rect.bottom + window.scrollY}px`;
-                emojiContainer.style.left = `${rect.left + window.scrollX}px`;
+                // Se cambia 'left' por 'right' para alinear a la derecha en móviles.
+                emojiContainer.style.left = 'auto';
+                emojiContainer.style.right = `${window.innerWidth - rect.right}px`;
             }
         });
 
