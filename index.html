@@ -223,19 +223,16 @@
                 messageInput.value += emoji;
                 emojiContainer.style.display = 'none';
             });
-            emojiContainer.appendChild(emojiContainer);
+            // La línea incorrecta era: emojiContainer.appendChild(emojiContainer);
+            emojiContainer.appendChild(emojiOption); // <-- LÍNEA CORREGIDA
         });
 
-        // =======================================================
-        //  LÓGICA CORREGIDA PARA EL PANEL DE EMOJIS
-        // =======================================================
         emojiButton.addEventListener('click', (e) => {
             const isHidden = emojiContainer.style.display === 'none' || emojiContainer.style.display === '';
             emojiContainer.style.display = isHidden ? 'block' : 'none';
             if (isHidden) {
                 const rect = emojiButton.getBoundingClientRect();
                 emojiContainer.style.top = `${rect.bottom + window.scrollY}px`;
-                // Se cambia 'left' por 'right' para alinear a la derecha en móviles.
                 emojiContainer.style.left = 'auto';
                 emojiContainer.style.right = `${window.innerWidth - rect.right}px`;
             }
