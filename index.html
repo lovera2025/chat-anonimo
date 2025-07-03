@@ -39,7 +39,7 @@
 </head>
 <body class="bg-gray-900 text-gray-100 flex items-center justify-center p-4">
 
-    <div class="container mx-auto max-w-lg bg-gray-800 rounded-lg shadow-xl p-6">
+    <div class="container mx-auto w-full max-w-lg bg-gray-800 rounded-lg shadow-xl p-6">
         <h1 class="text-2xl font-bold text-center mb-6 text-teal-400">Ayuda Anónima</h1>
 
         <div id="chat-box" class="border border-gray-700 rounded-lg p-4 mb-4 bg-gray-700">
@@ -60,15 +60,17 @@
         const socket = io();
 
         // Script JavaScript para manejar el chat y el anonimato
-        // Crear contenedores flotantes para los mensajes predefinidos
         const predefinedMessagesLeft = document.createElement('div');
-        predefinedMessagesLeft.classList.add('fixed', 'top-1/2', 'left-4', 'transform', '-translate-y-1/2', 'flex', 'flex-col', 'gap-2', 'z-10');
+        // CAMBIO 2: Se añaden las clases 'hidden' y 'md:flex' para ocultar en móvil y mostrar en pantallas medianas/grandes
+        predefinedMessagesLeft.classList.add('hidden', 'md:flex', 'fixed', 'top-1/2', 'left-4', 'transform', '-translate-y-1/2', 'flex-col', 'gap-2', 'z-10');
 
         const predefinedMessagesBottom = document.createElement('div');
-        predefinedMessagesBottom.classList.add('fixed', 'bottom-4', 'left-1/2', 'transform', '-translate-x-1/2', 'flex', 'flex-col', 'gap-2', 'z-10');
+        // Se oculta también el botón inferior en móvil para dar más espacio
+        predefinedMessagesBottom.classList.add('hidden', 'md:flex', 'fixed', 'bottom-4', 'left-1/2', 'transform', '-translate-x-1/2', 'flex-col', 'gap-2', 'z-10');
 
         const predefinedMessagesRight = document.createElement('div');
-        predefinedMessagesRight.classList.add('fixed', 'top-1/2', 'right-4', 'transform', '-translate-y-1/2', 'flex', 'flex-col', 'gap-2', 'z-10');
+        // CAMBIO 2: Se añaden las clases 'hidden' y 'md:flex'
+        predefinedMessagesRight.classList.add('hidden', 'md:flex', 'fixed', 'top-1/2', 'right-4', 'transform', '-translate-y-1/2', 'flex-col', 'gap-2', 'z-10');
 
         // Lista de mensajes predefinidos
         const predefinedMessages = [
@@ -92,7 +94,7 @@
             messageButton.addEventListener('click', () => {
                 const messageData = { senderId: anonymousUserId, message: text };
                 socket.emit('chat message', messageData);
-                addMessage(anonymousUserId, text); // Muestra el mensaje predefinido al instante
+                addMessage(anonymousUserId, text); 
             });
 
             container.appendChild(messageButton);
@@ -109,12 +111,10 @@
 
         const anonymousUserId = 'Usuario' + Math.floor(Math.random() * 10000);
 
-        // Función para añadir un mensaje al chat (modificada para diferenciar emisor)
         function addMessage(senderId, message) {
             const messageElement = document.createElement('div');
             messageElement.classList.add('mb-3', 'p-3', 'rounded-lg', 'max-w-xs');
 
-            // Comprueba si el mensaje es del usuario actual, de otra persona o del sistema
             if (senderId === anonymousUserId) {
                 messageElement.classList.add('bg-blue-600', 'text-white', 'ml-auto');
             } else if (senderId === 'Sistema') {
@@ -129,40 +129,31 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // Función para enviar el mensaje (reutilizable)
         function sendMessage() {
             const message = messageInput.value.trim();
             if (message) {
                 const messageData = { senderId: anonymousUserId, message: message };
                 socket.emit('chat message', messageData);
-                addMessage(anonymousUserId, message); // <-- LÍNEA AÑADIDA
+                addMessage(anonymousUserId, message);
                 messageInput.value = '';
             }
         }
         
-        // Evento para el botón Enviar
         sendButton.addEventListener('click', sendMessage);
 
-        // Permitir enviar mensaje con Enter
         messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 sendMessage();
             }
         });
 
-        // Escuchar los mensajes que llegan del servidor
         socket.on('chat message', (data) => {
-            // Evita duplicar el mensaje si es del propio usuario
             if (data.senderId !== anonymousUserId) {
                 addMessage(data.senderId, data.message);
             }
         });
 
-        // =======================================================
-        //  LÓGICA PARA CONFIRMAR LA ALERTA
-        // =======================================================
         socket.on('request-alert-confirmation', (alertData) => {
-            // Se usa el diálogo de confirmación del navegador. Es simple pero efectivo.
             const userConfirmed = confirm(
                 "Hemos detectado que podrías estar en una situación de riesgo.\n\n" +
                 "¿Deseas notificar de forma anónima a un administrador para que pueda asistirte?\n\n" +
@@ -170,18 +161,13 @@
             );
 
             if (userConfirmed) {
-                // Si el usuario confirma, se emite el evento de vuelta al servidor.
                 socket.emit('alert-confirmed', alertData);
-                
-                // Se muestra un mensaje de confirmación al usuario que envió la alerta.
                 addMessage('Sistema', 'Se ha enviado una alerta a un administrador. Estamos contigo.');
             } else {
-                // Si el usuario cancela, se le informa que el mensaje no se envió.
                 addMessage('Sistema', 'Tu mensaje no fue enviado. Si estás en peligro, no dudes en usar los botones de ayuda o llamar a las líneas de emergencia.');
             }
         });
 
-        // El resto de tu código de UI se mantiene intacto
         const backgroundCanvas = document.createElement('canvas');
         backgroundCanvas.id = 'background-canvas';
         Object.assign(backgroundCanvas.style, {
