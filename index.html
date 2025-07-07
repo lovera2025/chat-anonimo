@@ -61,9 +61,19 @@
                      <button id="quick-exit-button" class="bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 focus:outline-none text-sm">Salida Rápida</button>
                 </div>
             </div>`;
+        
+        // --- LÓGICA DE INICIALIZACIÓN ---
+        window.onload = function() {
+            fetch('/check-session').then(res => res.json()).then(data => {
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.has('login')) return showLogin();
+                if (urlParams.has('register')) return showRegister();
+                if (data.loggedIn) return loadApp(data.professional);
+                loadApp(null);
+            });
+        };
 
-        // --- MANEJO DE VISTAS Y ESTADO ---
-
+        // --- MANEJO DE VISTAS ---
         function showLogin() {
             appContainer.innerHTML = loginTemplate;
             document.getElementById('login-form').addEventListener('submit', handleLogin);
@@ -76,6 +86,33 @@
             document.getElementById('login-link').addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
         }
 
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorP = document.getElementById('form-message');
+            const response = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+            const data = await response.json();
+            if (response.ok) { window.location.href = '/'; } 
+            else { errorP.textContent = data.message; }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const form = e.target;
+            const messageP = document.getElementById('form-message');
+            const professionalData = { fullName: form.querySelector('#fullName').value, specialty: form.querySelector('#specialty').value, email: form.querySelector('#email').value, password: form.querySelector('#password').value };
+            const response = await fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(professionalData) });
+            const data = await response.json();
+            messageP.textContent = data.message;
+            if (response.ok) {
+                messageP.className = 'text-green-500 text-xs italic mt-4';
+                form.reset();
+            } else {
+                messageP.className = 'text-red-500 text-xs italic mt-4';
+            }
+        }
+        
         function loadApp(professional) {
             const isAdmin = !!professional;
             appContainer.innerHTML = chatTemplate;
@@ -106,40 +143,11 @@
                 window.location.href = '/';
             });
             document.getElementById('content-box').innerHTML = '<div class="text-yellow-400">Cargando historial...</div>';
-            socket.emit('admin-request-alerts');
             setupAdminListeners();
             setupCommonListeners(true);
         }
 
-        // --- MANEJO DE EVENTOS Y LÓGICA ---
-
-        async function handleLogin(e) {
-            e.preventDefault();
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const errorP = document.getElementById('form-message');
-            const response = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
-            const data = await response.json();
-            if (response.ok) { window.location.href = '/'; } 
-            else { errorP.textContent = data.message; }
-        }
-
-        async function handleRegister(e) {
-            e.preventDefault();
-            const form = e.target;
-            const messageP = document.getElementById('form-message');
-            const professionalData = { fullName: form.querySelector('#fullName').value, specialty: form.querySelector('#specialty').value, email: form.querySelector('#email').value, password: form.querySelector('#password').value };
-            const response = await fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(professionalData) });
-            const data = await response.json();
-            messageP.textContent = data.message;
-            if (response.ok) {
-                messageP.className = 'text-green-500 text-xs italic mt-4';
-                form.reset();
-            } else {
-                messageP.className = 'text-red-500 text-xs italic mt-4';
-            }
-        }
-        
+        // --- LISTENERS DE SOCKETS ---
         function setupAdminListeners() {
             socket.on('alert-history', renderAlerts);
             socket.on('new-alert-in-queue', newAlert => {
@@ -153,22 +161,26 @@
             });
         }
         
-        function setupChatListeners() {
+        function setupCommonListeners(isAdmin = false) {
             const sendButton = document.getElementById('send-button');
             const messageInput = document.getElementById('message-input');
+            
             if(sendButton && messageInput) {
                 sendButton.addEventListener('click', sendMessage);
                 messageInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
             }
 
-            socket.on('chat message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
+            if (!isAdmin) {
+                socket.on('chat message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
+                socket.on('request-alert-confirmation', alertData => { if (confirm("Hemos detectado que podrías estar en una situación de riesgo.\n\n¿Deseas notificar a un administrador?")) { socket.emit('alert-confirmed', alertData); } });
+                socket.on('alert-queued', () => {
+                    document.getElementById('input-area').style.display = 'none';
+                    document.getElementById('footer-buttons').style.display = 'none';
+                    document.getElementById('content-box').innerHTML = '<div class="text-center text-green-400 p-4">Tu petición fue enviada. Un administrador se conectará en cualquier momento. Por favor, no cierres esta ventana.</div>';
+                });
+            }
+
             socket.on('private-message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
-            socket.on('request-alert-confirmation', alertData => { if (confirm("Hemos detectado que podrías estar en una situación de riesgo.\n\n¿Deseas notificar a un administrador?")) { socket.emit('alert-confirmed', alertData); } });
-            socket.on('alert-queued', () => {
-                document.getElementById('input-area').style.display = 'none';
-                document.getElementById('footer-buttons').style.display = 'none';
-                document.getElementById('content-box').innerHTML = '<div class="text-center text-green-400 p-4">Tu petición fue enviada. Un administrador se conectará en cualquier momento. Por favor, no cierres esta ventana.</div>';
-            });
             socket.on('private-session-started', data => {
                 currentRoomId = data.roomId;
                 document.getElementById('main-title').textContent = `Sesión Privada con ${data.user}`;
@@ -178,7 +190,7 @@
             });
         }
 
-        // --- FUNCIONES DE RENDERIZADO Y MENSAJERÍA ---
+        // --- FUNCIONES DE RENDERIZADO ---
         function renderAlerts(alerts) {
             const contentBox = document.getElementById('content-box');
             contentBox.innerHTML = '';
@@ -203,6 +215,7 @@
             if (prepend) contentBox.prepend(alertElement); else contentBox.appendChild(alertElement);
         }
 
+        // --- FUNCIONES DE MENSAJERÍA ---
         function addMessage(senderId, message) {
             const contentBox = document.getElementById('content-box');
             if (!contentBox) return;
@@ -234,7 +247,7 @@
             const headerContainer = document.getElementById('header-container');
             const quickExitButton = document.getElementById('quick-exit-button');
             quickExitButton.addEventListener('click', () => { window.location.href = 'https://www.google.com'; });
-            
+
             headerContainer.innerHTML = '<a href="/?login=true" class="bg-teal-600 text-white py-1 px-3 rounded-lg text-sm hover:bg-teal-700">Acceso Profesional</a>';
             
             const headerInfo = document.createElement('div');
@@ -242,19 +255,19 @@
             headerInfo.textContent = 'Comunicate al 102 o 137 si sufris acoso, maltrato o bullying.';
             document.body.appendChild(headerInfo);
 
-            const predefinedMessages = [
+            const predefinedMessagesData = [
                 { text: "Estoy sufriendo acoso", position: 'left-4' },
                 { text: "Sufro maltrato", position: 'bottom-4' },
                 { text: "Me hacen bullying", position: 'right-4' }
             ];
-            predefinedMessages.forEach(({ text, position }) => {
+            predefinedMessagesData.forEach(({ text, position }) => {
                 const container = document.createElement('div');
                 let classes = ['hidden', 'md:flex', 'fixed', 'flex-col', 'gap-2', 'z-10'];
                 if(position.includes('left') || position.includes('right')) classes.push('top-1/2', 'transform', '-translate-y-1/2');
                 if(position.includes('bottom')) classes.push('left-1/2', 'transform', '-translate-x-1/2');
-                if(position.includes('left-4')) classes.push('left-4');
-                if(position.includes('right-4')) classes.push('right-4');
-                if(position.includes('bottom-4')) classes.push('bottom-4');
+                if(position === 'left-4') classes.push('left-4');
+                if(position === 'right-4') classes.push('right-4');
+                if(position === 'bottom-4') classes.push('bottom-4');
                 container.classList.add(...classes);
                 
                 const messageButton = document.createElement('button');
@@ -302,7 +315,7 @@
                     emojiContainer.style.display = 'none';
                 }
             });
-
+            
             const backgroundCanvas = document.getElementById('background-canvas');
             const ctx = backgroundCanvas.getContext('2d');
             let width, height;
@@ -333,8 +346,6 @@
             animateParticles();
         }
 
-        // --- INICIALIZACIÓN ---
-        window.onload();
     </script>
 </body>
 </html>
