@@ -23,7 +23,7 @@
         let currentRoomId = null;
         let IS_ADMIN = false; // Variable para saber si el usuario es un profesional
 
-        // --- PLANTILLAS HTML (Sin cambios) ---
+        // --- PLANTILLAS HTML ---
         const loginTemplate = `
             <div class="w-full max-w-sm bg-gray-800 rounded-lg shadow-xl p-8">
                 <h1 class="text-2xl font-bold text-center mb-6 text-teal-400">Acceso Profesional</h1>
@@ -64,7 +64,7 @@
                 </div>
             </div>`;
         
-        // --- MANEJO DE VISTAS (Sin cambios) ---
+        // --- MANEJO DE VISTAS ---
         function showLogin() {
             appContainer.innerHTML = loginTemplate;
             document.getElementById('login-btn').addEventListener('click', handleLogin);
@@ -76,7 +76,7 @@
             document.getElementById('login-link').addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
         }
         
-        // --- MANEJO DE FORMULARIOS (Sin cambios) ---
+        // --- MANEJO DE FORMULARIOS ---
         async function handleLogin(e) {
             e.preventDefault(); 
             const email = document.getElementById('email').value;
@@ -304,43 +304,43 @@
             const proLoginContainer = document.getElementById('professional-login-link-container');
             if (proLoginContainer) proLoginContainer.innerHTML = '<a href="/?login=true" class="text-sm text-gray-400 hover:text-teal-400">Acceso para Profesionales</a>';
             if (quickExitButton) quickExitButton.addEventListener('click', () => { window.location.href = 'https://www.google.com'; });
-            
-            // --- CÓDIGO MODIFICADO PARA LOS BOTONES DE ACCESO RÁPIDO ---
+
             const messageInput = document.getElementById('message-input');
 
             // Función auxiliar para crear y posicionar un botón de acceso rápido
             const createShortcutButton = (text, positionClasses) => {
                 const button = document.createElement('button');
                 button.textContent = text;
-                // Estilos de TailwindCSS para los botones
-                button.className = `fixed ${positionClasses} bg-blue-500 text-white py-2 px-4 rounded-lg shadow-lg hover:bg-blue-600 focus:outline-none text-sm z-20`;
+                // CAMBIO: Color de fondo ajustado para coincidir con la imagen
+                button.className = `fixed ${positionClasses} bg-teal-600 text-white py-2 px-4 rounded-lg shadow-lg hover:bg-teal-700 focus:outline-none text-sm z-20`;
                 
-                // Evento de clic para enviar el mensaje
                 button.addEventListener('click', () => {
                     if (messageInput) {
-                        // Colocamos el texto del botón en el campo de texto y lo enviamos
                         messageInput.value = text;
                         sendMessage();
                     }
                 });
-
-                // Agregamos el botón al cuerpo del documento para que sea visible
                 document.body.appendChild(button);
             };
 
-            // Creamos los tres botones con sus textos y posiciones
-            if (!IS_ADMIN) { // Nos aseguramos de que solo los usuarios normales vean estos botones
-                 createShortcutButton('Estoy sufriendo acoso', 'top-1/4 left-4');
-                 createShortcutButton('Me hacen bullying', 'top-1/4 right-4');
-                 createShortcutButton('Sufro maltrato', 'bottom-1/4 left-1/2 -translate-x-1/2');
-            }
-            // --- FIN DEL CÓDIGO MODIFICADO ---
-
-            // Emoji feature se llama condicionalmente más adelante
+            // Nos aseguramos de que solo los usuarios normales vean estos elementos
             if (!IS_ADMIN) {
-                 setupEmojiFeature();
+                // NUEVO: Aviso en la esquina superior izquierda
+                const helpNotice = document.createElement('p');
+                helpNotice.textContent = 'Comunicate al 102 o 137 si sufris acoso, maltrato o bullying.';
+                helpNotice.className = 'fixed top-4 left-4 text-gray-300 text-sm z-20';
+                document.body.appendChild(helpNotice);
+
+                // CAMBIO: Nuevas clases de posición para los botones
+                createShortcutButton('Estoy sufriendo acoso', 'top-1/2 -translate-y-1/2 left-4');
+                createShortcutButton('Me hacen bullying', 'top-1/2 -translate-y-1/2 right-4');
+                createShortcutButton('Sufro maltrato', 'bottom-10 left-1/2 -translate-x-1/2');
+                
+                // Se configura la función de emojis para el usuario
+                setupEmojiFeature();
             }
             
+            // Lógica para el fondo animado
             const backgroundCanvas = document.getElementById('background-canvas');
             if(backgroundCanvas) {
                 const ctx = backgroundCanvas.getContext('2d');
@@ -367,7 +367,7 @@
             }
         }
 
-        // --- INICIALIZACIÓN DEL SCRIPT (Sin cambios) ---
+        // --- INICIALIZACIÓN DEL SCRIPT ---
         async function initialize() {
             try {
                 const response = await fetch('/check-session');
