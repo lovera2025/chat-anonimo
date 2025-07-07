@@ -29,7 +29,7 @@
                 <form id="login-form">
                     <div class="mb-4"><label class="block text-gray-300 text-sm font-bold mb-2" for="email">Email</label><input class="shadow appearance-none border rounded w-full py-2 px-3 bg-gray-700 text-white focus:outline-none" id="email" type="email" required></div>
                     <div class="mb-6"><label class="block text-gray-300 text-sm font-bold mb-2" for="password">Contraseña</label><input class="shadow appearance-none border rounded w-full py-2 px-3 bg-gray-700 text-white mb-3 focus:outline-none" id="password" type="password" required></div>
-                    <div class="flex items-center justify-between"><button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Iniciar Sesión</button><a href="javascript:showRegister()" class="inline-block align-baseline font-bold text-sm text-teal-400 hover:text-teal-200">Registrarse</a></div>
+                    <div class="flex items-center justify-between"><button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Iniciar Sesión</button><a href="#" id="register-link" class="inline-block align-baseline font-bold text-sm text-teal-400 hover:text-teal-200">Registrarse</a></div>
                     <p id="form-message" class="text-red-500 text-xs italic mt-4"></p>
                 </form>
                 <div class="text-center mt-6"><a href="/" class="text-sm text-gray-400 hover:text-white">Ir al Chat Público &rarr;</a></div>
@@ -43,7 +43,7 @@
                     <div class="mb-4"><label for="specialty" class="block text-gray-300 text-sm font-bold mb-2">Especialidad</label><input class="shadow w-full py-2 px-3 bg-gray-700 rounded" id="specialty" type="text" required></div>
                     <div class="mb-4"><label for="email" class="block text-gray-300 text-sm font-bold mb-2">Email</label><input class="shadow w-full py-2 px-3 bg-gray-700 rounded" id="email" type="email" required></div>
                     <div class="mb-6"><label for="password" class="block text-gray-300 text-sm font-bold mb-2">Contraseña</label><input class="shadow w-full py-2 px-3 bg-gray-700 rounded" id="password" type="password" required></div>
-                    <div class="flex items-center justify-between"><button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Registrar Cuenta</button><a href="javascript:showLogin()" class="inline-block align-baseline font-bold text-sm text-teal-400 hover:text-teal-200">Ya tengo cuenta</a></div>
+                    <div class="flex items-center justify-between"><button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Registrar Cuenta</button><a href="#" id="login-link" class="inline-block align-baseline font-bold text-sm text-teal-400 hover:text-teal-200">Ya tengo cuenta</a></div>
                     <p id="form-message" class="text-xs italic mt-4"></p>
                 </form>
             </div>`;
@@ -63,17 +63,6 @@
                 </div>
             </div>`;
 
-        // --- LÓGICA DE INICIALIZACIÓN ---
-        function initialize() {
-            fetch('/check-session').then(res => res.json()).then(data => {
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.has('login')) return showLogin();
-                if (urlParams.has('register')) return showRegister();
-                if (data.loggedIn) return loadApp(data.professional);
-                loadApp(null);
-            });
-        }
-        
         // --- MANEJO DE VISTAS ---
         function showLogin() {
             appContainer.innerHTML = loginTemplate;
@@ -85,30 +74,29 @@
             document.getElementById('register-form').addEventListener('submit', handleRegister);
             document.getElementById('login-link').addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
         }
-
+        
+        // --- MANEJO DE FORMULARIOS ---
         async function handleLogin(e) {
             e.preventDefault();
             const [email, password, errorP] = [document.getElementById('email').value, document.getElementById('password').value, document.getElementById('form-message')];
-            const response = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
-            const data = await response.json();
-            if (response.ok) { window.location.href = '/'; } 
-            else { errorP.textContent = data.message; }
+            try {
+                const response = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+                const data = await response.json();
+                if (response.ok) { window.location.href = '/'; } else { errorP.textContent = data.message; }
+            } catch (err) { errorP.textContent = 'Error de conexión.'; }
         }
-
         async function handleRegister(e) {
             e.preventDefault();
             const form = e.target;
             const messageP = document.getElementById('form-message');
             const professionalData = { fullName: form.querySelector('#fullName').value, specialty: form.querySelector('#specialty').value, email: form.querySelector('#email').value, password: form.querySelector('#password').value };
-            const response = await fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(professionalData) });
-            const data = await response.json();
-            messageP.textContent = data.message;
-            if (response.ok) {
-                messageP.className = 'text-green-500 text-xs italic mt-4';
-                form.reset();
-            } else {
-                messageP.className = 'text-red-500 text-xs italic mt-4';
-            }
+            try {
+                const response = await fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(professionalData) });
+                const data = await response.json();
+                messageP.textContent = data.message;
+                if (response.ok) { messageP.className = 'text-green-500 text-xs italic mt-4'; form.reset(); } 
+                else { messageP.className = 'text-red-500 text-xs italic mt-4'; }
+            } catch (err) { messageP.textContent = 'Error de conexión.'; }
         }
 
         // --- LÓGICA DE CARGA DE LA APP ---
@@ -122,7 +110,7 @@
                 loadUserChat();
             }
         }
-
+        
         function loadUserChat() {
             socket.emit('register-user', currentUserId);
             document.getElementById('main-title').textContent = 'Ayuda Anónima';
@@ -135,12 +123,8 @@
             socket.emit('register-user', 'ADMINISTRADOR');
             document.getElementById('main-title').textContent = `Panel de Alertas - ${professional.fullName}`;
             document.getElementById('input-area').style.display = 'none';
-            const footerArea = document.getElementById('footer-area');
-            footerArea.innerHTML = '<button id="logout-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">Cerrar Sesión</button>';
-            document.getElementById('logout-btn').addEventListener('click', async () => {
-                await fetch('/logout', { method: 'POST' });
-                window.location.href = '/';
-            });
+            document.getElementById('footer-area').innerHTML = '<button id="logout-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">Cerrar Sesión</button>';
+            document.getElementById('logout-btn').addEventListener('click', async () => { await fetch('/logout', { method: 'POST' }); window.location.href = '/'; });
             document.getElementById('content-box').innerHTML = '<div class="text-yellow-400">Cargando historial...</div>';
             setupAdminListeners();
             setupCommonListeners(true);
@@ -149,20 +133,13 @@
         // --- LISTENERS DE SOCKETS ---
         function setupAdminListeners() {
             socket.on('alert-history', renderAlerts);
-            socket.on('new-alert-in-queue', newAlert => {
-                document.getElementById('no-alerts-msg')?.remove();
-                renderSingleAlert(newAlert, true);
-            });
-            socket.on('user-disconnected-error', data => {
-                alert(`El usuario ${data.userId} ya no está conectado.`);
-                socket.emit('admin-request-alerts');
-            });
+            socket.on('new-alert-in-queue', newAlert => { document.getElementById('no-alerts-msg')?.remove(); renderSingleAlert(newAlert, true); });
+            socket.on('user-disconnected-error', data => { alert(`El usuario ${data.userId} ya no está conectado.`); socket.emit('admin-request-alerts'); });
         }
         
         function setupCommonListeners(isAdmin = false) {
             const sendButton = document.getElementById('send-button');
             const messageInput = document.getElementById('message-input');
-            
             if(sendButton && messageInput) {
                 sendButton.addEventListener('click', sendMessage);
                 messageInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
@@ -192,10 +169,7 @@
         function renderAlerts(alerts) {
             const contentBox = document.getElementById('content-box');
             contentBox.innerHTML = '';
-            if (alerts.length === 0) {
-                contentBox.innerHTML = '<div id="no-alerts-msg" class="text-gray-400">No hay alertas pendientes.</div>';
-                return;
-            }
+            if (alerts.length === 0) { contentBox.innerHTML = '<div id="no-alerts-msg" class="text-gray-400">No hay alertas pendientes.</div>'; return; }
             alerts.forEach(alert => renderSingleAlert(alert));
         }
 
@@ -239,11 +213,12 @@
             messageInput.value = '';
         }
 
-        // --- FUNCIONES VISUALES ---
+        // --- FUNCIONES VISUALES (REINTEGRADAS) ---
         function setupVisualFeatures() {
             const sendButton = document.getElementById('send-button');
             const quickExitButton = document.getElementById('quick-exit-button');
             const proLoginContainer = document.getElementById('professional-login-link-container');
+            const headerContainer = document.getElementById('header-container');
             
             proLoginContainer.innerHTML = '<a href="/?login=true" class="text-sm text-gray-400 hover:text-teal-400">Acceso para Profesionales</a>';
             quickExitButton.addEventListener('click', () => { window.location.href = 'https://www.google.com'; });
