@@ -57,13 +57,14 @@
                     <input type="text" id="message-input" class="flex-grow p-3 rounded-l-lg bg-gray-600 text-white focus:outline-none" placeholder="Escribe tu mensaje...">
                     <button id="send-button" class="bg-teal-500 text-white p-3 rounded-r-lg">Enviar</button>
                 </div>
-                <div id="footer-buttons" class="text-center mt-6">
+                <div id="footer-area" class="text-center mt-4 space-y-3">
                      <button id="quick-exit-button" class="bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 focus:outline-none text-sm">Salida Rápida</button>
+                     <div id="professional-login-link-container"></div>
                 </div>
             </div>`;
-        
+
         // --- LÓGICA DE INICIALIZACIÓN ---
-        window.onload = function() {
+        function initialize() {
             fetch('/check-session').then(res => res.json()).then(data => {
                 const urlParams = new URLSearchParams(window.location.search);
                 if (urlParams.has('login')) return showLogin();
@@ -71,15 +72,14 @@
                 if (data.loggedIn) return loadApp(data.professional);
                 loadApp(null);
             });
-        };
-
+        }
+        
         // --- MANEJO DE VISTAS ---
         function showLogin() {
             appContainer.innerHTML = loginTemplate;
             document.getElementById('login-form').addEventListener('submit', handleLogin);
             document.getElementById('register-link').addEventListener('click', (e) => { e.preventDefault(); showRegister(); });
         }
-        
         function showRegister() {
             appContainer.innerHTML = registerTemplate;
             document.getElementById('register-form').addEventListener('submit', handleRegister);
@@ -88,9 +88,7 @@
 
         async function handleLogin(e) {
             e.preventDefault();
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const errorP = document.getElementById('form-message');
+            const [email, password, errorP] = [document.getElementById('email').value, document.getElementById('password').value, document.getElementById('form-message')];
             const response = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
             const data = await response.json();
             if (response.ok) { window.location.href = '/'; } 
@@ -112,7 +110,8 @@
                 messageP.className = 'text-red-500 text-xs italic mt-4';
             }
         }
-        
+
+        // --- LÓGICA DE CARGA DE LA APP ---
         function loadApp(professional) {
             const isAdmin = !!professional;
             appContainer.innerHTML = chatTemplate;
@@ -136,8 +135,8 @@
             socket.emit('register-user', 'ADMINISTRADOR');
             document.getElementById('main-title').textContent = `Panel de Alertas - ${professional.fullName}`;
             document.getElementById('input-area').style.display = 'none';
-            document.getElementById('footer-buttons').style.display = 'none';
-            document.getElementById('header-container').innerHTML = '<button id="logout-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded text-sm">Cerrar Sesión</button>';
+            const footerArea = document.getElementById('footer-area');
+            footerArea.innerHTML = '<button id="logout-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">Cerrar Sesión</button>';
             document.getElementById('logout-btn').addEventListener('click', async () => {
                 await fetch('/logout', { method: 'POST' });
                 window.location.href = '/';
@@ -151,8 +150,7 @@
         function setupAdminListeners() {
             socket.on('alert-history', renderAlerts);
             socket.on('new-alert-in-queue', newAlert => {
-                const noAlertsMsg = document.getElementById('no-alerts-msg');
-                if (noAlertsMsg) noAlertsMsg.remove();
+                document.getElementById('no-alerts-msg')?.remove();
                 renderSingleAlert(newAlert, true);
             });
             socket.on('user-disconnected-error', data => {
@@ -170,16 +168,6 @@
                 messageInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
             }
 
-            if (!isAdmin) {
-                socket.on('chat message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
-                socket.on('request-alert-confirmation', alertData => { if (confirm("Hemos detectado que podrías estar en una situación de riesgo.\n\n¿Deseas notificar a un administrador?")) { socket.emit('alert-confirmed', alertData); } });
-                socket.on('alert-queued', () => {
-                    document.getElementById('input-area').style.display = 'none';
-                    document.getElementById('footer-buttons').style.display = 'none';
-                    document.getElementById('content-box').innerHTML = '<div class="text-center text-green-400 p-4">Tu petición fue enviada. Un administrador se conectará en cualquier momento. Por favor, no cierres esta ventana.</div>';
-                });
-            }
-
             socket.on('private-message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
             socket.on('private-session-started', data => {
                 currentRoomId = data.roomId;
@@ -188,8 +176,18 @@
                 document.getElementById('content-box').innerHTML = '';
                 addMessage('Sistema', 'Estás en una conversación privada y segura.');
             });
-        }
 
+            if (!isAdmin) {
+                socket.on('chat message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
+                socket.on('request-alert-confirmation', alertData => { if (confirm("Hemos detectado que podrías estar en una situación de riesgo.\n\n¿Deseas notificar a un administrador?")) { socket.emit('alert-confirmed', alertData); } });
+                socket.on('alert-queued', () => {
+                    document.getElementById('input-area').style.display = 'none';
+                    document.getElementById('footer-area').style.display = 'none';
+                    document.getElementById('content-box').innerHTML = '<div class="text-center text-green-400 p-4">Tu petición fue enviada. Un administrador se conectará en cualquier momento. Por favor, no cierres esta ventana.</div>';
+                });
+            }
+        }
+        
         // --- FUNCIONES DE RENDERIZADO ---
         function renderAlerts(alerts) {
             const contentBox = document.getElementById('content-box');
@@ -241,43 +239,33 @@
             messageInput.value = '';
         }
 
-        // --- FUNCIONES VISUALES (REINTEGRADAS) ---
+        // --- FUNCIONES VISUALES ---
         function setupVisualFeatures() {
             const sendButton = document.getElementById('send-button');
-            const headerContainer = document.getElementById('header-container');
             const quickExitButton = document.getElementById('quick-exit-button');
+            const proLoginContainer = document.getElementById('professional-login-link-container');
+            
+            proLoginContainer.innerHTML = '<a href="/?login=true" class="text-sm text-gray-400 hover:text-teal-400">Acceso para Profesionales</a>';
             quickExitButton.addEventListener('click', () => { window.location.href = 'https://www.google.com'; });
-
-            headerContainer.innerHTML = '<a href="/?login=true" class="bg-teal-600 text-white py-1 px-3 rounded-lg text-sm hover:bg-teal-700">Acceso Profesional</a>';
             
             const headerInfo = document.createElement('div');
             headerInfo.classList.add('hidden', 'md:block', 'absolute', 'top-4', 'left-4', 'text-sm', 'text-gray-300', 'bg-gray-800', 'p-2', 'rounded-lg', 'shadow-md');
             headerInfo.textContent = 'Comunicate al 102 o 137 si sufris acoso, maltrato o bullying.';
             document.body.appendChild(headerInfo);
 
-            const predefinedMessagesData = [
-                { text: "Estoy sufriendo acoso", position: 'left-4' },
-                { text: "Sufro maltrato", position: 'bottom-4' },
-                { text: "Me hacen bullying", position: 'right-4' }
-            ];
+            const predefinedMessagesData = [ { text: "Estoy sufriendo acoso", position: 'left-4' }, { text: "Sufro maltrato", position: 'bottom-4' }, { text: "Me hacen bullying", position: 'right-4' }];
             predefinedMessagesData.forEach(({ text, position }) => {
                 const container = document.createElement('div');
                 let classes = ['hidden', 'md:flex', 'fixed', 'flex-col', 'gap-2', 'z-10'];
-                if(position.includes('left') || position.includes('right')) classes.push('top-1/2', 'transform', '-translate-y-1/2');
-                if(position.includes('bottom')) classes.push('left-1/2', 'transform', '-translate-x-1/2');
-                if(position === 'left-4') classes.push('left-4');
-                if(position === 'right-4') classes.push('right-4');
-                if(position === 'bottom-4') classes.push('bottom-4');
+                if (position.includes('left') || position.includes('right')) classes.push('top-1/2', 'transform', '-translate-y-1/2');
+                else if (position.includes('bottom')) classes.push('left-1/2', 'transform', '-translate-x-1/2');
+                if (position === 'left-4') classes.push('left-4'); else if (position === 'right-4') classes.push('right-4'); else if (position === 'bottom-4') classes.push('bottom-4');
                 container.classList.add(...classes);
-                
                 const messageButton = document.createElement('button');
                 messageButton.textContent = text;
                 messageButton.classList.add('bg-teal-500', 'text-white', 'p-3', 'rounded-lg', 'hover:bg-teal-600', 'text-sm', 'shadow-lg');
                 if (position === 'bottom-4') messageButton.classList.add('text-lg', 'p-4');
-                messageButton.addEventListener('click', () => {
-                    document.getElementById('message-input').value = text;
-                    sendMessage();
-                });
+                messageButton.addEventListener('click', () => { document.getElementById('message-input').value = text; sendMessage(); });
                 container.appendChild(messageButton);
                 document.body.appendChild(container);
             });
@@ -294,41 +282,23 @@
                 const emojiOption = document.createElement('button');
                 emojiOption.textContent = emoji;
                 emojiOption.classList.add('text-xl', 'p-2', 'hover:bg-gray-700', 'rounded');
-                emojiOption.addEventListener('click', () => {
-                    document.getElementById('message-input').value += emoji;
-                    emojiContainer.style.display = 'none';
-                });
+                emojiOption.addEventListener('click', () => { document.getElementById('message-input').value += emoji; emojiContainer.style.display = 'none'; });
                 emojiContainer.appendChild(emojiOption);
             });
             emojiButton.addEventListener('click', (e) => {
                 const isHidden = emojiContainer.style.display === 'none' || emojiContainer.style.display === '';
                 emojiContainer.style.display = isHidden ? 'block' : 'none';
-                if (isHidden) {
-                    const rect = emojiButton.getBoundingClientRect();
-                    emojiContainer.style.top = `${rect.bottom + window.scrollY}px`;
-                    emojiContainer.style.left = 'auto';
-                    emojiContainer.style.right = `${window.innerWidth - rect.right}px`;
-                }
+                if (isHidden) { const rect = emojiButton.getBoundingClientRect(); emojiContainer.style.top = `${rect.bottom + window.scrollY}px`; emojiContainer.style.left = 'auto'; emojiContainer.style.right = `${window.innerWidth - rect.right}px`; }
             });
-            document.body.addEventListener('click', (e) => {
-                if (!emojiContainer.contains(e.target) && e.target !== emojiButton) {
-                    emojiContainer.style.display = 'none';
-                }
-            });
-            
+            document.body.addEventListener('click', (e) => { if (emojiContainer && !emojiContainer.contains(e.target) && e.target !== emojiButton) { emojiContainer.style.display = 'none'; } });
+
             const backgroundCanvas = document.getElementById('background-canvas');
             const ctx = backgroundCanvas.getContext('2d');
             let width, height;
             const particles = [];
-            function resizeCanvas() {
-                width = backgroundCanvas.width = window.innerWidth;
-                height = backgroundCanvas.height = window.innerHeight;
-                particles.length = 0;
-                for(let i=0; i<100; i++) {
-                    particles.push({ x: Math.random() * width, y: Math.random() * height, size: Math.random() * 3 + 1, dx: Math.random() * 0.5 - 0.25, dy: Math.random() * 0.5 - 0.25, opacity: Math.random() * 0.5 + 0.2 });
-                }
-            }
+            function resizeCanvas() { width = backgroundCanvas.width = window.innerWidth; height = backgroundCanvas.height = window.innerHeight; particles.length = 0; for(let i=0; i<100; i++) { particles.push({ x: Math.random() * width, y: Math.random() * height, size: Math.random() * 3 + 1, dx: Math.random() * 0.5 - 0.25, dy: Math.random() * 0.5 - 0.25, opacity: Math.random() * 0.5 + 0.2 }); } }
             function animateParticles() {
+                if (!document.getElementById('background-canvas')) return;
                 ctx.clearRect(0, 0, width, height);
                 particles.forEach(p => {
                     ctx.beginPath();
@@ -345,6 +315,9 @@
             resizeCanvas();
             animateParticles();
         }
+
+        // --- INICIALIZACIÓN ---
+        initialize();
 
     </script>
 </body>
