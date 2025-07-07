@@ -62,7 +62,7 @@
                      <div id="professional-login-link-container"></div>
                 </div>
             </div>`;
-
+        
         // --- MANEJO DE VISTAS ---
         function showLogin() {
             appContainer.innerHTML = loginTemplate;
@@ -78,11 +78,14 @@
         // --- MANEJO DE FORMULARIOS ---
         async function handleLogin(e) {
             e.preventDefault();
-            const [email, password, errorP] = [document.getElementById('email').value, document.getElementById('password').value, document.getElementById('form-message')];
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorP = document.getElementById('form-message');
             try {
                 const response = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
                 const data = await response.json();
-                if (response.ok) { window.location.href = '/'; } else { errorP.textContent = data.message; }
+                if (response.ok) { window.location.href = '/'; } 
+                else { errorP.textContent = data.message; }
             } catch (err) { errorP.textContent = 'Error de conexión.'; }
         }
         async function handleRegister(e) {
@@ -94,8 +97,12 @@
                 const response = await fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(professionalData) });
                 const data = await response.json();
                 messageP.textContent = data.message;
-                if (response.ok) { messageP.className = 'text-green-500 text-xs italic mt-4'; form.reset(); } 
-                else { messageP.className = 'text-red-500 text-xs italic mt-4'; }
+                if (response.ok) {
+                    messageP.className = 'text-green-500 text-xs italic mt-4';
+                    form.reset();
+                } else {
+                    messageP.className = 'text-red-500 text-xs italic mt-4';
+                }
             } catch (err) { messageP.textContent = 'Error de conexión.'; }
         }
 
@@ -110,7 +117,7 @@
                 loadUserChat();
             }
         }
-        
+
         function loadUserChat() {
             socket.emit('register-user', currentUserId);
             document.getElementById('main-title').textContent = 'Ayuda Anónima';
@@ -123,8 +130,12 @@
             socket.emit('register-user', 'ADMINISTRADOR');
             document.getElementById('main-title').textContent = `Panel de Alertas - ${professional.fullName}`;
             document.getElementById('input-area').style.display = 'none';
-            document.getElementById('footer-area').innerHTML = '<button id="logout-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">Cerrar Sesión</button>';
-            document.getElementById('logout-btn').addEventListener('click', async () => { await fetch('/logout', { method: 'POST' }); window.location.href = '/'; });
+            const footerArea = document.getElementById('footer-area');
+            footerArea.innerHTML = '<button id="logout-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">Cerrar Sesión</button>';
+            document.getElementById('logout-btn').addEventListener('click', async () => {
+                await fetch('/logout', { method: 'POST' });
+                window.location.href = '/';
+            });
             document.getElementById('content-box').innerHTML = '<div class="text-yellow-400">Cargando historial...</div>';
             setupAdminListeners();
             setupCommonListeners(true);
@@ -133,13 +144,21 @@
         // --- LISTENERS DE SOCKETS ---
         function setupAdminListeners() {
             socket.on('alert-history', renderAlerts);
-            socket.on('new-alert-in-queue', newAlert => { document.getElementById('no-alerts-msg')?.remove(); renderSingleAlert(newAlert, true); });
-            socket.on('user-disconnected-error', data => { alert(`El usuario ${data.userId} ya no está conectado.`); socket.emit('admin-request-alerts'); });
+            socket.on('new-alert-in-queue', newAlert => {
+                const noAlertsMsg = document.getElementById('no-alerts-msg');
+                if (noAlertsMsg) noAlertsMsg.remove();
+                renderSingleAlert(newAlert, true);
+            });
+            socket.on('user-disconnected-error', data => {
+                alert(`El usuario ${data.userId} ya no está conectado.`);
+                socket.emit('admin-request-alerts');
+            });
         }
         
         function setupCommonListeners(isAdmin = false) {
             const sendButton = document.getElementById('send-button');
             const messageInput = document.getElementById('message-input');
+            
             if(sendButton && messageInput) {
                 sendButton.addEventListener('click', sendMessage);
                 messageInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
@@ -169,7 +188,10 @@
         function renderAlerts(alerts) {
             const contentBox = document.getElementById('content-box');
             contentBox.innerHTML = '';
-            if (alerts.length === 0) { contentBox.innerHTML = '<div id="no-alerts-msg" class="text-gray-400">No hay alertas pendientes.</div>'; return; }
+            if (alerts.length === 0) {
+                contentBox.innerHTML = '<div id="no-alerts-msg" class="text-gray-400">No hay alertas pendientes.</div>';
+                return;
+            }
             alerts.forEach(alert => renderSingleAlert(alert));
         }
 
@@ -218,7 +240,6 @@
             const sendButton = document.getElementById('send-button');
             const quickExitButton = document.getElementById('quick-exit-button');
             const proLoginContainer = document.getElementById('professional-login-link-container');
-            const headerContainer = document.getElementById('header-container');
             
             proLoginContainer.innerHTML = '<a href="/?login=true" class="text-sm text-gray-400 hover:text-teal-400">Acceso para Profesionales</a>';
             quickExitButton.addEventListener('click', () => { window.location.href = 'https://www.google.com'; });
@@ -273,7 +294,8 @@
             const particles = [];
             function resizeCanvas() { width = backgroundCanvas.width = window.innerWidth; height = backgroundCanvas.height = window.innerHeight; particles.length = 0; for(let i=0; i<100; i++) { particles.push({ x: Math.random() * width, y: Math.random() * height, size: Math.random() * 3 + 1, dx: Math.random() * 0.5 - 0.25, dy: Math.random() * 0.5 - 0.25, opacity: Math.random() * 0.5 + 0.2 }); } }
             function animateParticles() {
-                if (!document.getElementById('background-canvas')) return;
+                const canvas = document.getElementById('background-canvas');
+                if (!canvas) return;
                 ctx.clearRect(0, 0, width, height);
                 particles.forEach(p => {
                     ctx.beginPath();
@@ -291,7 +313,7 @@
             animateParticles();
         }
 
-        // --- INICIALIZACIÓN ---
+        // --- INICIALIZACIÓN DEL SCRIPT ---
         initialize();
 
     </script>
