@@ -78,11 +78,20 @@ app.post('/login', async (req, res) => {
     if (!isMatch) return res.status(401).json({ message: 'Credenciales incorrectas.' });
 
     req.session.professional = { id: professional._id.toString(), email: professional.email, fullName: professional.fullName };
-    res.json({ success: true, professional: req.session.professional });
+    
+    // --- CAMBIO IMPORTANTE: Guardamos la sesión manualmente antes de responder ---
+    req.session.save(err => {
+        if (err) {
+            console.error('Error al guardar sesión:', err);
+            return res.status(500).json({ message: 'Error al guardar la sesión.' });
+        }
+        // Solo respondemos cuando estamos seguros de que se guardó
+        res.json({ success: true, professional: req.session.professional });
+    });
 });
 
 app.get('/check-session', (req, res) => {
-    if (req.session.professional) {
+    if (req.session && req.session.professional) {
         res.json({ loggedIn: true, professional: req.session.professional });
     } else {
         res.json({ loggedIn: false });
@@ -107,7 +116,7 @@ io.on('connection', (socket) => {
     if (session && session.professional) {
         console.log(`Un profesional (${session.professional.fullName}) se ha conectado: ${socket.id}`);
         adminSockets.push(socket.id);
-        socket.join('admin-room'); // <-- CAMBIO 1: El profesional se une a la sala de admins
+        socket.join('admin-room');
         socket.emit('admin-welcome', session.professional);
     } else {
         console.log(`Un usuario se ha conectado: ${socket.id}`);
@@ -118,12 +127,17 @@ io.on('connection', (socket) => {
     });
 
     socket.on('admin-request-alerts', async () => {
-        if (session && session.professional) {
-            try {
-                const alerts = await db.collection('alerts').find({ status: 'pendiente' }).sort({ timestamp: -1 }).toArray();
-                socket.emit('alert-history', alerts);
-            } catch (e) { console.error('Error al obtener alertas:', e); }
-        }
+        // Recargamos la sesión para asegurarnos de tener la data más reciente
+        socket.request.session.reload(async (err) => {
+            if (err) return console.error("Error recargando sesión en socket:", err);
+            
+            if (socket.request.session && socket.request.session.professional) {
+                try {
+                    const alerts = await db.collection('alerts').find({ status: 'pendiente' }).sort({ timestamp: -1 }).toArray();
+                    socket.emit('alert-history', alerts);
+                } catch (e) { console.error('Error al obtener alertas:', e); }
+            }
+        });
     });
 
     socket.on('chat message', async (data) => {
@@ -147,11 +161,7 @@ io.on('connection', (socket) => {
         try {
             const result = await db.collection('alerts').insertOne(alertRecord);
             socket.emit('alert-queued');
-
-            // Notifica a todos los admins conectados
-            adminSockets.forEach(adminId => {
-                io.to(adminId).emit('new-alert-in-queue', { ...alertRecord, _id: result.insertedId });
-            });
+            io.to('admin-room').emit('new-alert-in-queue', { ...alertRecord, _id: result.insertedId });
         } catch (e) { console.error(e); }
         
         sgMail.send({
@@ -162,24 +172,23 @@ io.on('connection', (socket) => {
     });
 
     socket.on('admin-connect-to-user', async (data) => {
+        const professionalFullName = socket.request.session.professional ? socket.request.session.professional.fullName : 'Admin';
         const { alertId, targetUserId } = data;
         const targetSocketId = liveUsers[targetUserId];
-        const adminSocket = socket;
 
         if (targetSocketId && io.sockets.sockets.get(targetSocketId)) {
             const userSocket = io.sockets.sockets.get(targetSocketId);
             const privateRoomId = `session-${alertId}`;
-            adminSocket.join(privateRoomId);
+            socket.join(privateRoomId);
             userSocket.join(privateRoomId);
-            await db.collection('alerts').updateOne({ _id: new ObjectId(alertId) }, { $set: { status: 'activa', attendedBy: session.professional.fullName } });
+            await db.collection('alerts').updateOne({ _id: new ObjectId(alertId) }, { $set: { status: 'activa', attendedBy: professionalFullName } });
             
-            // <-- CAMBIO 2: Avisa a los otros admins en la sala que la alerta fue tomada
             socket.to('admin-room').emit('alert-claimed', { alertId: alertId });
 
-            adminSocket.emit('private-session-started', { roomId: privateRoomId, user: targetUserId });
-            userSocket.emit('private-session-started', { roomId: privateRoomId, user: session.professional.fullName });
+            socket.emit('private-session-started', { roomId: privateRoomId, user: targetUserId });
+            userSocket.emit('private-session-started', { roomId: privateRoomId, user: professionalFullName });
         } else {
-            adminSocket.emit('user-disconnected-error', { userId: targetUserId });
+            socket.emit('user-disconnected-error', { userId: targetUserId });
             await db.collection('alerts').updateOne({ _id: new ObjectId(alertId) }, { $set: { status: 'cerrada (offline)' } });
         }
     });
