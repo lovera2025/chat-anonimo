@@ -6,15 +6,19 @@
     <title>Ayuda Anónima</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
+    <style>
+        #content-box { max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; }
+        body { min-height: 100vh; font-family: "Inter", sans-serif; }
+    </style>
 </head>
-<body class="bg-gray-900 text-gray-100 flex items-center justify-center min-h-screen p-4">
+<body class="bg-gray-900 text-gray-100 flex items-center justify-center p-4">
 
     <div id="app-container"></div>
 
     <script>
         const socket = io();
         const appContainer = document.getElementById('app-container');
-        let anonymousUserId = 'Usuario' + Math.floor(Math.random() * 10000);
+        let currentUserId = 'Usuario' + Math.floor(Math.random() * 10000);
         let currentRoomId = null;
 
         // --- Plantillas HTML ---
@@ -22,19 +26,24 @@
             <div class="w-full max-w-sm bg-gray-800 rounded-lg shadow-xl p-8">
                 <h1 class="text-2xl font-bold text-center mb-6 text-teal-400">Acceso Profesional</h1>
                 <form id="login-form">
-                    <div class="mb-4">
-                        <label class="block text-gray-300 text-sm font-bold mb-2" for="email">Email</label>
-                        <input class="shadow appearance-none border rounded w-full py-2 px-3 bg-gray-600 text-white focus:outline-none" id="email" type="email" required>
-                    </div>
-                    <div class="mb-6">
-                        <label class="block text-gray-300 text-sm font-bold mb-2" for="password">Contraseña</label>
-                        <input class="shadow appearance-none border rounded w-full py-2 px-3 bg-gray-600 text-white mb-3 focus:outline-none" id="password" type="password" required>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none">Iniciar Sesión</button>
-                        <a href="/" class="inline-block align-baseline font-bold text-sm text-blue-500 hover:text-blue-800">Ir al Chat Público</a>
-                    </div>
-                    <p id="login-error" class="text-red-500 text-xs italic mt-4"></p>
+                    <div class="mb-4"><label class="block text-gray-300 text-sm font-bold mb-2" for="email">Email</label><input class="shadow appearance-none border rounded w-full py-2 px-3 bg-gray-600 text-white focus:outline-none" id="email" type="email" required></div>
+                    <div class="mb-6"><label class="block text-gray-300 text-sm font-bold mb-2" for="password">Contraseña</label><input class="shadow appearance-none border rounded w-full py-2 px-3 bg-gray-600 text-white mb-3 focus:outline-none" id="password" type="password" required></div>
+                    <div class="flex items-center justify-between"><button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Iniciar Sesión</button><a href="javascript:showRegister()" class="inline-block align-baseline font-bold text-sm text-teal-400 hover:text-teal-200">Registrarse</a></div>
+                    <p id="form-message" class="text-xs italic mt-4"></p>
+                </form>
+                 <div class="text-center mt-6"><a href="/" class="text-sm text-gray-400 hover:text-white">Ir al Chat Público &rarr;</a></div>
+            </div>`;
+
+        const registerTemplate = `
+            <div class="w-full max-w-sm bg-gray-800 rounded-lg shadow-xl p-8">
+                <h1 class="text-2xl font-bold text-center mb-6 text-teal-400">Registro Profesional</h1>
+                <form id="register-form">
+                    <div class="mb-4"><label for="fullName" class="block text-gray-300 text-sm font-bold mb-2">Nombre Completo</label><input class="shadow w-full py-2 px-3 bg-gray-600 rounded" id="fullName" type="text" required></div>
+                    <div class="mb-4"><label for="specialty" class="block text-gray-300 text-sm font-bold mb-2">Especialidad</label><input class="shadow w-full py-2 px-3 bg-gray-600 rounded" id="specialty" type="text" required></div>
+                    <div class="mb-4"><label for="email" class="block text-gray-300 text-sm font-bold mb-2">Email</label><input class="shadow w-full py-2 px-3 bg-gray-600 rounded" id="email" type="email" required></div>
+                    <div class="mb-6"><label for="password" class="block text-gray-300 text-sm font-bold mb-2">Contraseña</label><input class="shadow w-full py-2 px-3 bg-gray-600 rounded" id="password" type="password" required></div>
+                    <div class="flex items-center justify-between"><button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Registrar Cuenta</button><a href="javascript:showLogin()" class="inline-block align-baseline font-bold text-sm text-teal-400 hover:text-teal-200">Ya tengo cuenta</a></div>
+                    <p id="form-message" class="text-xs italic mt-4"></p>
                 </form>
             </div>`;
 
@@ -48,64 +57,99 @@
                 </div>
             </div>`;
 
-        // --- Lógica Principal ---
-        
-        // Al cargar la página, verificamos si ya hay una sesión de profesional
-        fetch('/check-session').then(res => res.json()).then(data => {
-            if (data.loggedIn) {
-                loadAdminPanel(data.professional);
-            } else {
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('login') !== null) {
-                    showLogin();
+        // --- Lógica de Inicialización ---
+        window.onload = () => {
+            fetch('/check-session').then(res => res.json()).then(data => {
+                if (data.loggedIn) {
+                    loadApp(data.professional);
                 } else {
-                    loadUserChat();
+                    const urlParams = new URLSearchParams(window.location.search);
+                    if (window.location.pathname.startsWith('/login')) {
+                        showLogin();
+                    } else {
+                        loadApp(null); // Carga como usuario anónimo
+                    }
                 }
-            }
-        });
+            });
+        };
 
         function showLogin() {
             appContainer.innerHTML = loginTemplate;
-            document.getElementById('login-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const email = document.getElementById('email').value;
-                const password = document.getElementById('password').value;
-                const errorP = document.getElementById('login-error');
-                
-                const response = await fetch('/login', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    loadAdminPanel(data.professional);
-                } else {
-                    errorP.textContent = data.message;
-                }
-            });
+            document.getElementById('login-form').addEventListener('submit', handleLogin);
+            document.getElementById('register-link').addEventListener('click', (e) => { e.preventDefault(); showRegister(); });
+        }
+        
+        function showRegister() {
+            appContainer.innerHTML = registerTemplate;
+            document.getElementById('register-form').addEventListener('submit', handleRegister);
+            document.getElementById('login-link').addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
         }
 
-        function loadUserChat() {
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorP = document.getElementById('form-message');
+            const response = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+            const data = await response.json();
+            if (response.ok) {
+                window.location.reload(); // Recarga la página para que check-session nos lleve al panel
+            } else {
+                errorP.textContent = data.message;
+                errorP.className = 'text-red-500 text-xs italic mt-4';
+            }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const form = e.target;
+            const messageP = document.getElementById('form-message');
+            const professionalData = { fullName: form.querySelector('#fullName').value, specialty: form.querySelector('#specialty').value, email: form.querySelector('#email').value, password: form.querySelector('#password').value };
+            const response = await fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(professionalData) });
+            const data = await response.json();
+            if (response.ok) {
+                messageP.className = 'text-green-500 text-xs italic mt-4';
+                messageP.textContent = '¡Registro exitoso! Ahora puedes iniciar sesión.';
+                form.reset();
+            } else {
+                messageP.className = 'text-red-500 text-xs italic mt-4';
+                messageP.textContent = data.message;
+            }
+        }
+
+        function loadApp(professional) {
+            const isAdmin = !!professional;
+            if(isAdmin) { currentUserId = professional.fullName; }
+            
             appContainer.innerHTML = chatTemplate;
+            
+            // Re-inicializamos los elementos del DOM después de cargar la plantilla
             const mainTitle = document.getElementById('main-title');
-            mainTitle.textContent = 'Ayuda Anónima';
-            document.getElementById('content-box').innerHTML = `<div class="text-center text-gray-400 italic">¡Bienvenido! Estás conectado como ${anonymousUserId}.</div>`;
+            const inputArea = document.getElementById('input-area');
+            const contentBox = document.getElementById('content-box');
+            const sendButton = document.getElementById('send-button');
+            const messageInput = document.getElementById('message-input');
+            
+            sendButton.addEventListener('click', sendMessage);
+            messageInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
+            
+            socket.on('connect', () => {
+                socket.emit('register-user', currentUserId);
+            });
+
+            if(isAdmin) {
+                mainTitle.textContent = `Panel de Alertas - ${professional.fullName}`;
+                inputArea.style.display = 'none';
+                contentBox.innerHTML = '<div class="text-yellow-400">Cargando historial...</div>';
+                socket.emit('admin-request-alerts');
+                setupAdminListeners();
+            } else {
+                mainTitle.textContent = 'Ayuda Anónima';
+                contentBox.innerHTML = `<div class="text-center text-gray-400 italic">¡Bienvenido! Estás conectado como ${currentUserId}.</div>`;
+            }
             setupChatListeners();
         }
 
-        function loadAdminPanel(professional) {
-            appContainer.innerHTML = chatTemplate;
-            const mainTitle = document.getElementById('main-title');
-            const inputArea = document.getElementById('input-area');
-            mainTitle.textContent = `Panel de Alertas - ${professional.fullName}`;
-            inputArea.style.display = 'none';
-            document.getElementById('content-box').innerHTML = '<div class="text-yellow-400">Cargando historial...</div>';
-            anonymousUserId = professional.fullName; // El admin tiene su propio nombre
-            socket.emit('admin-request-alerts');
-            setupAdminListeners();
-            setupChatListeners(); // El admin también necesita los listeners del chat para las sesiones privadas
-        }
-        
         function setupAdminListeners() {
             socket.on('alert-history', renderAlerts);
             socket.on('new-alert-in-queue', newAlert => {
@@ -120,18 +164,8 @@
         }
         
         function setupChatListeners() {
-            const sendButton = document.getElementById('send-button');
-            const messageInput = document.getElementById('message-input');
-
-            sendButton.addEventListener('click', sendMessage);
-            messageInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
-            
-            socket.on('chat message', data => {
-                if (data.senderId !== anonymousUserId) addMessage(data.senderId, data.message);
-            });
-            socket.on('private-message', data => {
-                if (data.senderId !== anonymousUserId) addMessage(data.senderId, data.message);
-            });
+            socket.on('chat message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
+            socket.on('private-message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
             socket.on('request-alert-confirmation', alertData => {
                 if (confirm("Hemos detectado que podrías estar en una situación de riesgo.\n\n¿Deseas notificar a un administrador?")) {
                     socket.emit('alert-confirmed', alertData);
@@ -143,25 +177,30 @@
             });
             socket.on('private-session-started', data => {
                 currentRoomId = data.roomId;
-                document.getElementById('main-title').textContent = `Sesión Privada con ${data.userId}`;
+                document.getElementById('main-title').textContent = `Sesión Privada con ${data.user}`;
                 document.getElementById('input-area').style.display = 'flex';
                 document.getElementById('content-box').innerHTML = '';
                 addMessage('Sistema', 'Estás en una conversación privada y segura.');
-                messageInput.focus();
             });
         }
 
-        function renderAlerts(alerts) {
+        function renderAlerts(alerts) { /* ... lógica para renderizar alertas ... */ }
+        function renderSingleAlert(alert, prepend = false) { /* ... lógica para renderizar una alerta ... */ }
+        function addMessage(senderId, message) { /* ... lógica para añadir un mensaje ... */ }
+        function sendMessage() { /* ... lógica para enviar un mensaje ... */ }
+
+        // Duplicamos aquí las funciones de renderizado y mensajería para que estén disponibles en el scope global
+        window.renderAlerts = function(alerts) {
             const contentBox = document.getElementById('content-box');
             contentBox.innerHTML = '';
             if (alerts.length === 0) {
                 contentBox.innerHTML = '<div id="no-alerts-msg" class="text-gray-400">No hay alertas pendientes.</div>';
                 return;
             }
-            alerts.forEach(alert => renderSingleAlert(alert));
+            alerts.forEach(alert => window.renderSingleAlert(alert));
         }
 
-        function renderSingleAlert(alert, prepend = false) {
+        window.renderSingleAlert = function(alert, prepend = false) {
             const contentBox = document.getElementById('content-box');
             const alertElement = document.createElement('div');
             alertElement.classList.add('p-3', 'mb-2', 'border-b', 'border-gray-600', 'flex', 'justify-between', 'items-center');
@@ -175,11 +214,11 @@
             if (prepend) contentBox.prepend(alertElement); else contentBox.appendChild(alertElement);
         }
 
-        function addMessage(senderId, message) {
+        window.addMessage = function(senderId, message) {
             const contentBox = document.getElementById('content-box');
             const messageElement = document.createElement('div');
             messageElement.classList.add('p-2', 'mb-2', 'rounded-lg', 'max-w-[80%]', 'break-words', 'self-start');
-            const isMyMessage = (senderId === anonymousUserId);
+            const isMyMessage = (senderId === currentUserId);
             if (isMyMessage) messageElement.classList.replace('self-start', 'self-end');
             messageElement.classList.add(isMyMessage ? 'bg-blue-600' : 'bg-gray-600', 'text-white');
             messageElement.innerHTML = `<strong class="text-xs opacity-75 block">${senderId}</strong>${message}`;
@@ -187,15 +226,15 @@
             contentBox.scrollTop = contentBox.scrollHeight;
         }
 
-        function sendMessage() {
+        window.sendMessage = function() {
             const messageInput = document.getElementById('message-input');
             const message = messageInput.value.trim();
             if (!message) return;
-            addMessage(anonymousUserId, message);
+            addMessage(currentUserId, message);
             if (currentRoomId) {
-                socket.emit('private-message', { message, senderId: anonymousUserId, roomId: currentRoomId });
+                socket.emit('private-message', { message, senderId: currentUserId, roomId: currentRoomId });
             } else {
-                socket.emit('chat message', { message, senderId: anonymousUserId });
+                socket.emit('chat message', { message, senderId: currentUserId });
             }
             messageInput.value = '';
         }
