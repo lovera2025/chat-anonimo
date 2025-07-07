@@ -9,6 +9,21 @@
     <style>
         #content-box { max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; scroll-behavior: smooth; }
         body { min-height: 100vh; font-family: "Inter", sans-serif; }
+
+        /* CÓDIGO AÑADIDO PARA LA IDEA 2 */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .message-bubble {
+            animation: fadeInUp 0.3s ease-out;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 flex items-center justify-center p-4">
@@ -239,11 +254,28 @@
             const messageElement = document.createElement('div');
             const isCurrentUser = senderId === currentUserId;
             const senderDisplay = isCurrentUser ? 'Tú' : senderId;
-            messageElement.className = `p-2 my-1 rounded-lg max-w-xs ${isCurrentUser ? 'bg-teal-600 self-end' : 'bg-gray-600 self-start'}`;
+
+            // AÑADIDO: Clase para la animación y 'relative' para posicionar la cola
+            messageElement.className = `message-bubble p-2 my-1 rounded-lg max-w-xs relative ${isCurrentUser ? 'bg-teal-600 self-end' : 'bg-gray-600 self-start'}`;
+            
             messageElement.innerHTML = `<div class="font-semibold text-sm">${senderDisplay}</div><div>${message}</div>`;
+
+            // AÑADIDO: Lógica para crear la "cola" de la burbuja
+            const tail = document.createElement('div');
+            if (isCurrentUser) {
+                // Cola para el usuario (apunta desde la derecha)
+                tail.className = "absolute bottom-0 right-[-6px] w-0 h-0 border-l-[10px] border-l-transparent border-t-[10px] border-t-teal-600";
+            } else {
+                // Cola para el otro participante (apunta desde la izquierda)
+                tail.className = "absolute bottom-0 left-[-6px] w-0 h-0 border-r-[10px] border-r-transparent border-t-[10px] border-t-gray-600";
+            }
+            // Importante: La cola se debe añadir al elemento del mensaje para que se posicione correctamente
+            messageElement.appendChild(tail);
+
             contentBox.appendChild(messageElement);
             contentBox.scrollTop = contentBox.scrollHeight;
         }
+
         function sendMessage() {
             const messageInput = document.getElementById('message-input');
             const message = messageInput.value.trim();
