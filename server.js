@@ -23,6 +23,12 @@ const clientPromise = mongoClient.connect().then(client => {
 }).catch(err => console.error('Error al conectar a MongoDB:', err));
 
 const app = express();
+
+// --- AJUSTE FINAL Y CLAVE ---
+// Le decimos a Express que confíe en el proxy de Render.
+// Esto debe ir antes de que se configure el middleware de sesión.
+app.set('trust proxy', 1);
+
 app.use(express.json());
 const server = http.createServer(app);
 const io = socketIO(server);
@@ -32,10 +38,9 @@ const sessionMiddleware = session({
     secret: 'mi_secreto_de_sesion_super_seguro_cambiar',
     resave: false,
     saveUninitialized: false,
-    // --- CORRECCIÓN FINAL ---
     store: MongoStore.create({
-        clientPromise: clientPromise, // Usamos la promesa de conexión compartida
-        ttl: 14 * 24 * 60 * 60,       // Y quitamos el dbName que generaba conflicto
+        clientPromise: clientPromise,
+        ttl: 14 * 24 * 60 * 60,
     }),
     cookie: {
         secure: process.env.NODE_ENV === 'production'
@@ -107,9 +112,8 @@ app.post('/logout', (req, res) => {
     });
 });
 
-// --- Lógica de Socket.IO ---
+// --- Lógica de Socket.IO (Sin cambios) ---
 let liveUsers = {};
-
 io.on('connection', (socket) => {
     const session = socket.request.session;
     if (session && session.professional) {
@@ -117,9 +121,7 @@ io.on('connection', (socket) => {
         socket.join('admin-room');
     }
 
-    socket.on('register-user', (userId) => {
-        liveUsers[userId] = socket.id;
-    });
+    socket.on('register-user', (userId) => { liveUsers[userId] = socket.id; });
 
     socket.on('admin-request-alerts', async () => {
         socket.request.session.reload(async (err) => {
@@ -140,12 +142,8 @@ io.on('connection', (socket) => {
             const sentiment = result.documentSentiment;
             if (sentiment.score <= -0.5 && sentiment.magnitude >= 0.5) {
                 socket.emit('request-alert-confirmation', { message: data.message, user: data.senderId });
-            } else {
-                io.emit('chat message', data);
-            }
-        } catch (error) {
-            io.emit('chat message', data);
-        }
+            } else { io.emit('chat message', data); }
+        } catch (error) { io.emit('chat message', data); }
     });
     
     socket.on('alert-confirmed', async (alertData) => {
@@ -183,9 +181,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('private-message', (data) => {
-        socket.to(data.roomId).emit('private-message', data);
-    });
+    socket.on('private-message', (data) => { socket.to(data.roomId).emit('private-message', data); });
 
     socket.on('disconnect', () => {
         for (const userId in liveUsers) {
