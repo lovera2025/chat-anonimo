@@ -16,9 +16,11 @@ const languageClient = new language.LanguageServiceClient();
 const mongoClient = new MongoClient(mongoUri);
 
 let db;
-mongoClient.connect().then(client => {
+// Nos conectamos y guardamos la conexión para que la use toda la app
+const clientPromise = mongoClient.connect().then(client => {
     console.log('Conectado a la base de datos de MongoDB Atlas');
     db = client.db('chat_anonimo');
+    return client; // Devolvemos el cliente para que connect-mongo lo use
 }).catch(err => console.error('Error al conectar a MongoDB:', err));
 
 const app = express();
@@ -31,8 +33,10 @@ const sessionMiddleware = session({
     secret: 'mi_secreto_de_sesion_super_seguro_cambiar',
     resave: false,
     saveUninitialized: false,
+    // --- CAMBIO CLAVE: Usamos la misma conexión de MongoDB para todo ---
     store: MongoStore.create({
-        mongoUrl: mongoUri,
+        clientPromise: clientPromise, // Le pasamos la promesa de conexión
+        dbName: 'chat_anonimo',
         ttl: 14 * 24 * 60 * 60 // 14 días
     }),
     cookie: {
@@ -46,11 +50,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static(__dirname));
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
 
-// --- Rutas de Autenticación ---
-app.post('/register', async (req, res) => {
-    // (Sin cambios en esta ruta)
-});
-
+// --- Rutas de Autenticación (con los logs de depuración, por si acaso) ---
 app.post('/login', async (req, res) => {
     console.log('--- [DEBUG] INICIO DE LOGIN ---');
     const { email, password } = req.body;
@@ -115,12 +115,38 @@ app.get('/check-session', (req, res) => {
     }
 });
 
-app.post('/logout', (req, res) => {
-    // (Sin cambios en esta ruta)
+// El resto del archivo (logout, socket.io, etc.) no necesita cambios
+// y puede quedar como está en tu versión anterior. Lo incluyo para que
+// tengas el archivo completo y no haya dudas.
+
+app.post('/register', async (req, res) => {
+    const { email, password, fullName, specialty } = req.body;
+    if (!db) return res.status(500).json({ message: 'Error del servidor.' });
+
+    const existingProfessional = await db.collection('professionals').findOne({ email });
+    if (existingProfessional) return res.status(400).json({ message: 'El email ya está registrado.' });
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const newProfessional = { email, password: hashedPassword, fullName, specialty, createdAt: new Date() };
+    
+    try {
+        await db.collection('professionals').insertOne(newProfessional);
+        res.status(201).json({ success: true, message: 'Profesional registrado con éxito.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error al registrar el profesional.' });
+    }
 });
 
-// --- Lógica de Socket.IO (sin cambios) ---
-// (El resto del código de Socket.IO permanece igual)
+app.post('/logout', (req, res) => {
+    req.session.destroy(err => {
+        if (err) return res.status(500).json({ message: 'Error al cerrar sesión.' });
+        res.clearCookie('connect.sid');
+        res.json({ success: true });
+    });
+});
+
 let liveUsers = {};
 
 io.on('connection', (socket) => {
@@ -129,8 +155,6 @@ io.on('connection', (socket) => {
     if (session && session.professional) {
         console.log(`Un profesional (${session.professional.fullName}) se ha conectado: ${socket.id}`);
         socket.join('admin-room');
-    } else {
-        // console.log(`Un usuario se ha conectado: ${socket.id}`);
     }
 
     socket.on('register-user', (userId) => {
@@ -211,13 +235,11 @@ io.on('connection', (socket) => {
         for (const userId in liveUsers) {
             if (liveUsers[userId] === socket.id) {
                 delete liveUsers[userId];
-                // console.log(`Usuario ${userId} desconectado.`);
                 break;
             }
         }
     });
 });
-
 
 server.listen(PORT, () => {
     console.log(`Servidor escuchando en el puerto ${PORT}`);
