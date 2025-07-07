@@ -314,6 +314,33 @@
         }
 
         // --- INICIALIZACIÓN DEL SCRIPT ---
+        async function initialize() {
+            try {
+                // Verificamos si hay un profesional logueado en el backend
+                const response = await fetch('/check-session');
+                const data = await response.json();
+                
+                // Verificamos si la URL indica que se quiere hacer login (ej: /?login=true)
+                const urlParams = new URLSearchParams(window.location.search);
+                const isLoginPage = urlParams.get('login') === 'true';
+
+                if (data.loggedIn) {
+                    // Si hay una sesión activa, cargamos la app en modo profesional/admin
+                    loadApp(data.professional);
+                } else if (isLoginPage) {
+                    // Si no hay sesión pero se quiere ir al login, mostramos el formulario
+                    showLogin();
+                } else {
+                    // Si no, es un usuario normal en el chat público
+                    loadApp(null);
+                }
+            } catch (error) {
+                console.error("Error al inicializar la app:", error);
+                // Si hay un error, mostramos el chat por defecto para que no se quede en blanco
+                loadApp(null);
+            }
+        }
+        
         initialize();
 
     </script>
