@@ -7,10 +7,17 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        #content-box { max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; scroll-behavior: smooth; }
-        body { min-height: 100vh; font-family: "Inter", sans-serif; }
+        /* La altura del body y el scroll suave se mantienen, son buenas prácticas. */
+        #content-box { 
+            display: flex; 
+            flex-direction: column; 
+            scroll-behavior: smooth; 
+        }
+        body { 
+            font-family: "Inter", sans-serif; 
+        }
 
-        /* CÓDIGO AÑADIDO PARA LA IDEA 2 */
+        /* La animación de los mensajes es un gran detalle, la conservamos. */
         @keyframes fadeInUp {
             from {
                 opacity: 0;
@@ -26,21 +33,21 @@
         }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 flex items-center justify-center p-4">
+<body class="bg-gray-900 text-gray-100 flex items-center justify-center min-h-screen p-2 sm:p-4">
 
-    <div id="app-container"></div>
+    <div id="app-container" class="w-full mt-10 md:mt-0"></div>
     <canvas id="background-canvas" class="fixed top-0 left-0 w-full h-full -z-10"></canvas>
 
     <script>
         const socket = io();
         const appContainer = document.getElementById('app-container');
-        let currentUserId = 'Usuario' + Math.floor(Math.random() * 10000);
+        let currentUserId = 'Usuario' + Math.floor(Math.random() * 1000);
         let currentRoomId = null;
         let IS_ADMIN = false;
 
-        // --- PLANTILLAS HTML ---
+        // --- PLANTILLAS HTML (con ajustes de responsividad) ---
         const loginTemplate = `
-            <div class="w-full max-w-sm bg-gray-800 rounded-lg shadow-xl p-8">
+            <div class="w-full max-w-sm bg-gray-800 rounded-lg shadow-xl p-6 sm:p-8">
                 <h1 class="text-2xl font-bold text-center mb-6 text-teal-400">Acceso Profesional</h1>
                 <form id="login-form">
                     <div class="mb-4"><label class="block text-gray-300 text-sm font-bold mb-2" for="email">Email</label><input class="shadow appearance-none border rounded w-full py-2 px-3 bg-gray-700 text-white focus:outline-none" id="email" type="email" required></div>
@@ -52,7 +59,7 @@
             </div>`;
 
         const registerTemplate = `
-            <div class="w-full max-w-sm bg-gray-800 rounded-lg shadow-xl p-8">
+             <div class="w-full max-w-sm bg-gray-800 rounded-lg shadow-xl p-6 sm:p-8">
                 <h1 class="text-2xl font-bold text-center mb-6 text-teal-400">Registro Profesional</h1>
                 <form id="register-form">
                     <div class="mb-4"><label for="fullName" class="block text-gray-300 text-sm font-bold mb-2">Nombre Completo</label><input class="shadow w-full py-2 px-3 bg-gray-700 rounded" id="fullName" type="text" required></div>
@@ -65,10 +72,11 @@
             </div>`;
 
         const chatTemplate = `
-            <div class="container mx-auto w-full max-w-lg bg-gray-800 rounded-lg shadow-xl p-6 relative">
+            <div class="container mx-auto w-full max-w-lg bg-gray-800 rounded-lg shadow-xl p-4 sm:p-6 relative flex flex-col h-[90vh] sm:h-auto">
                 <div id="header-container" class="absolute top-4 right-4 flex gap-2 items-center"></div>
-                <h1 id="main-title" class="text-2xl font-bold text-center mb-6 text-teal-400"></h1>
-                <div id="content-box" class="border border-gray-700 rounded-lg p-4 mb-4 bg-gray-700 min-h-[400px]"></div>
+                <h1 id="main-title" class="text-xl sm:text-2xl font-bold text-center mb-4 text-teal-400"></h1>
+                
+                <div id="content-box" class="border border-gray-700 rounded-lg p-4 mb-4 bg-gray-700 flex-grow overflow-y-auto min-h-0"></div>
                 
                 <div id="typing-indicator" class="text-gray-400 italic text-sm h-5 mb-1 px-1"></div>
 
@@ -82,6 +90,8 @@
                 </div>
             </div>`;
         
+        // --- El resto del script de JS se mantiene igual, con excepción de la función setupVisualFeatures ---
+
         // --- MANEJO DE VISTAS ---
         function showLogin() {
             appContainer.innerHTML = loginTemplate;
@@ -329,7 +339,6 @@
                 addMessage(currentUserId, message);
                 messageInput.value = '';
 
-                // Detener el indicador de escritura al enviar un mensaje
                 socket.emit('stop typing', { roomId: currentRoomId });
                 clearTimeout(typingTimer);
                 isTyping = false;
@@ -387,7 +396,8 @@
             const createShortcutButton = (text, positionClasses) => {
                 const button = document.createElement('button');
                 button.textContent = text;
-                button.className = `fixed ${positionClasses} bg-teal-600 text-white py-2 px-4 rounded-lg shadow-lg hover:bg-teal-700 focus:outline-none text-sm z-20 transition-transform duration-200 ease-in-out hover:scale-105`;
+                // CAMBIO 6: Ocultar botones de acceso rápido en móviles.
+                button.className = `hidden md:block fixed ${positionClasses} bg-teal-600 text-white py-2 px-4 rounded-lg shadow-lg hover:bg-teal-700 focus:outline-none text-sm z-20 transition-transform duration-200 ease-in-out hover:scale-105`;
                 
                 button.addEventListener('click', () => {
                     if (messageInput) {
@@ -401,7 +411,8 @@
             if (!IS_ADMIN) {
                 const helpNotice = document.createElement('p');
                 helpNotice.textContent = 'Comunicate al 102 o 137 si sufris acoso, maltrato o bullying.';
-                helpNotice.className = 'fixed top-4 left-4 text-gray-300 text-sm z-20';
+                // CAMBIO 7: Adaptar el aviso para que sea más pequeño y no moleste en móviles.
+                helpNotice.className = 'fixed top-2 left-1/2 -translate-x-1/2 bg-gray-900 bg-opacity-80 px-3 py-1 rounded-full text-gray-300 text-xs sm:text-sm z-20';
                 document.body.appendChild(helpNotice);
 
                 createShortcutButton('Estoy sufriendo acoso', 'top-1/2 -translate-y-1/2 left-4');
