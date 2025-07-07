@@ -7,16 +7,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        #content-box { max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; }
-        #content-box::-webkit-scrollbar { width: 8px; }
-        #content-box::-webkit-scrollbar-track { background: #1a202c; border-radius: 10px; }
-        #content-box::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 10px; }
+        #content-box { max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; scroll-behavior: smooth; }
         body { min-height: 100vh; font-family: "Inter", sans-serif; }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 flex items-center justify-center p-4">
 
     <div id="app-container"></div>
+    <canvas id="background-canvas" class="fixed top-0 left-0 w-full h-full -z-10"></canvas>
 
     <script>
         const socket = io();
@@ -29,8 +27,8 @@
             <div class="w-full max-w-sm bg-gray-800 rounded-lg shadow-xl p-8">
                 <h1 class="text-2xl font-bold text-center mb-6 text-teal-400">Acceso Profesional</h1>
                 <form id="login-form">
-                    <div class="mb-4"><label class="block text-gray-300 text-sm font-bold mb-2" for="email">Email</label><input class="shadow appearance-none border rounded w-full py-2 px-3 bg-gray-600 text-white focus:outline-none" id="email" type="email" required></div>
-                    <div class="mb-6"><label class="block text-gray-300 text-sm font-bold mb-2" for="password">Contraseña</label><input class="shadow appearance-none border rounded w-full py-2 px-3 bg-gray-600 text-white mb-3 focus:outline-none" id="password" type="password" required></div>
+                    <div class="mb-4"><label class="block text-gray-300 text-sm font-bold mb-2" for="email">Email</label><input class="shadow appearance-none border rounded w-full py-2 px-3 bg-gray-700 text-white focus:outline-none" id="email" type="email" required></div>
+                    <div class="mb-6"><label class="block text-gray-300 text-sm font-bold mb-2" for="password">Contraseña</label><input class="shadow appearance-none border rounded w-full py-2 px-3 bg-gray-700 text-white mb-3 focus:outline-none" id="password" type="password" required></div>
                     <div class="flex items-center justify-between"><button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Iniciar Sesión</button><a href="javascript:showRegister()" class="inline-block align-baseline font-bold text-sm text-teal-400 hover:text-teal-200">Registrarse</a></div>
                     <p id="form-message" class="text-red-500 text-xs italic mt-4"></p>
                 </form>
@@ -41,10 +39,10 @@
             <div class="w-full max-w-sm bg-gray-800 rounded-lg shadow-xl p-8">
                 <h1 class="text-2xl font-bold text-center mb-6 text-teal-400">Registro Profesional</h1>
                 <form id="register-form">
-                    <div class="mb-4"><label for="fullName" class="block text-gray-300 text-sm font-bold mb-2">Nombre Completo</label><input class="shadow w-full py-2 px-3 bg-gray-600 rounded" id="fullName" type="text" required></div>
-                    <div class="mb-4"><label for="specialty" class="block text-gray-300 text-sm font-bold mb-2">Especialidad</label><input class="shadow w-full py-2 px-3 bg-gray-600 rounded" id="specialty" type="text" required></div>
-                    <div class="mb-4"><label for="email" class="block text-gray-300 text-sm font-bold mb-2">Email</label><input class="shadow w-full py-2 px-3 bg-gray-600 rounded" id="email" type="email" required></div>
-                    <div class="mb-6"><label for="password" class="block text-gray-300 text-sm font-bold mb-2">Contraseña</label><input class="shadow w-full py-2 px-3 bg-gray-600 rounded" id="password" type="password" required></div>
+                    <div class="mb-4"><label for="fullName" class="block text-gray-300 text-sm font-bold mb-2">Nombre Completo</label><input class="shadow w-full py-2 px-3 bg-gray-700 rounded" id="fullName" type="text" required></div>
+                    <div class="mb-4"><label for="specialty" class="block text-gray-300 text-sm font-bold mb-2">Especialidad</label><input class="shadow w-full py-2 px-3 bg-gray-700 rounded" id="specialty" type="text" required></div>
+                    <div class="mb-4"><label for="email" class="block text-gray-300 text-sm font-bold mb-2">Email</label><input class="shadow w-full py-2 px-3 bg-gray-700 rounded" id="email" type="email" required></div>
+                    <div class="mb-6"><label for="password" class="block text-gray-300 text-sm font-bold mb-2">Contraseña</label><input class="shadow w-full py-2 px-3 bg-gray-700 rounded" id="password" type="password" required></div>
                     <div class="flex items-center justify-between"><button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Registrar Cuenta</button><a href="javascript:showLogin()" class="inline-block align-baseline font-bold text-sm text-teal-400 hover:text-teal-200">Ya tengo cuenta</a></div>
                     <p id="form-message" class="text-xs italic mt-4"></p>
                 </form>
@@ -52,9 +50,9 @@
 
         const chatTemplate = `
             <div class="container mx-auto w-full max-w-lg bg-gray-800 rounded-lg shadow-xl p-6 relative">
-                <div id="header-container" class="absolute top-4 right-4"></div>
+                <div id="header-container" class="absolute top-4 right-4 flex gap-2 items-center"></div>
                 <h1 id="main-title" class="text-2xl font-bold text-center mb-6 text-teal-400"></h1>
-                <div id="content-box" class="border border-gray-700 rounded-lg p-4 mb-4 bg-gray-700 min-h-[400px] overflow-y-auto flex flex-col"></div>
+                <div id="content-box" class="border border-gray-700 rounded-lg p-4 mb-4 bg-gray-700 min-h-[400px]"></div>
                 <div id="input-area" class="flex">
                     <input type="text" id="message-input" class="flex-grow p-3 rounded-l-lg bg-gray-600 text-white focus:outline-none" placeholder="Escribe tu mensaje...">
                     <button id="send-button" class="bg-teal-500 text-white p-3 rounded-r-lg">Enviar</button>
@@ -68,15 +66,10 @@
         window.onload = () => {
             fetch('/check-session').then(res => res.json()).then(data => {
                 const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('login')) {
-                    showLogin();
-                } else if (urlParams.get('register')) {
-                    showRegister();
-                } else if (data.loggedIn) {
-                    loadApp(data.professional);
-                } else {
-                    loadApp(null);
-                }
+                if (urlParams.get('login')) return showLogin();
+                if (urlParams.get('register')) return showRegister();
+                if (data.loggedIn) return loadApp(data.professional);
+                loadApp(null);
             });
         };
 
@@ -98,11 +91,8 @@
             const [email, password, errorP] = [document.getElementById('email').value, document.getElementById('password').value, document.getElementById('form-message')];
             const response = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
             const data = await response.json();
-            if (response.ok) {
-                window.location.href = '/';
-            } else {
-                errorP.textContent = data.message;
-            }
+            if (response.ok) { window.location.href = '/'; } 
+            else { errorP.textContent = data.message; }
         }
 
         async function handleRegister(e) {
@@ -121,65 +111,45 @@
             }
         }
 
+        // --- FUNCIÓN PRINCIPAL DE CARGA DE LA APP ---
         function loadApp(professional) {
             const isAdmin = !!professional;
-            if (isAdmin) { currentUserId = professional.fullName; }
-            
             appContainer.innerHTML = chatTemplate;
-            setupDOMandListeners(isAdmin, professional);
-        }
-
-        // --- FUNCIÓN CENTRAL DE INICIALIZACIÓN DE UI ---
-        function setupDOMandListeners(isAdmin, professional) {
-            socket.emit('register-user', currentUserId);
-            
-            const mainTitle = document.getElementById('main-title');
-            const inputArea = document.getElementById('input-area');
-            const contentBox = document.getElementById('content-box');
-            const sendButton = document.getElementById('send-button');
-            const messageInput = document.getElementById('message-input');
-            const footerButtons = document.getElementById('footer-buttons');
-            const headerContainer = document.getElementById('header-container');
-
-            sendButton.addEventListener('click', sendMessage);
-            messageInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
-            
             if (isAdmin) {
-                mainTitle.textContent = `Panel de Alertas - ${professional.fullName}`;
-                inputArea.style.display = 'none';
-                headerContainer.innerHTML = '<button id="logout-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded text-sm">Cerrar Sesión</button>';
-                footerButtons.style.display = 'none';
-
-                document.getElementById('logout-btn').addEventListener('click', async () => {
-                    await fetch('/logout', { method: 'POST' });
-                    window.location.href = '/';
-                });
-                
-                contentBox.innerHTML = '<div class="text-yellow-400">Cargando historial...</div>';
-                socket.emit('admin-request-alerts');
-                setupAdminListeners();
+                currentUserId = professional.fullName;
+                loadAdminPanel(professional);
             } else {
-                mainTitle.textContent = 'Ayuda Anónima';
-                contentBox.innerHTML = `<div class="text-center text-gray-400 italic">¡Bienvenido! Estás conectado como ${currentUserId}.</div>`;
-                setupVisualFeatures();
+                loadUserChat();
             }
             setupChatListeners();
         }
 
-        // --- LÓGICA DE SOCKETS Y RENDERIZADO ---
-        function setupAdminListeners() { /* ... */ }
-        function setupChatListeners() { /* ... */ }
-        function renderAlerts(alerts) { /* ... */ }
-        function renderSingleAlert(alert, prepend) { /* ... */ }
-        function addMessage(senderId, message) { /* ... */ }
-        function sendMessage() { /* ... */ }
+        function loadUserChat() {
+            socket.emit('register-user', currentUserId);
+            const mainTitle = document.getElementById('main-title');
+            mainTitle.textContent = 'Ayuda Anónima';
+            document.getElementById('content-box').innerHTML = `<div class="text-center text-gray-400 italic">¡Bienvenido! Estás conectado como ${currentUserId}.</div>`;
+            setupVisualFeatures();
+        }
 
-        // --- FUNCIONES VISUALES ---
-        function setupVisualFeatures() { /* ... */ }
+        function loadAdminPanel(professional) {
+            socket.emit('register-user', 'ADMINISTRADOR');
+            currentUserId = professional.fullName;
+            document.getElementById('main-title').textContent = `Panel de Alertas - ${professional.fullName}`;
+            document.getElementById('input-area').style.display = 'none';
+            document.getElementById('footer-buttons').style.display = 'none';
+            document.getElementById('header-container').innerHTML = '<button id="logout-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded text-sm">Cerrar Sesión</button>';
+            document.getElementById('logout-btn').addEventListener('click', async () => {
+                await fetch('/logout', { method: 'POST' });
+                window.location.href = '/';
+            });
+            document.getElementById('content-box').innerHTML = '<div class="text-yellow-400">Cargando historial...</div>';
+            socket.emit('admin-request-alerts');
+            setupAdminListeners();
+        }
 
-        // --- DEFINICIONES DE FUNCIONES COMPLETAS ---
-        
-        setupAdminListeners = () => {
+        // --- LISTENERS DE SOCKETS ---
+        function setupAdminListeners() {
             socket.on('alert-history', renderAlerts);
             socket.on('new-alert-in-queue', newAlert => {
                 const noAlertsMsg = document.getElementById('no-alerts-msg');
@@ -190,9 +160,9 @@
                 alert(`El usuario ${data.userId} ya no está conectado.`);
                 socket.emit('admin-request-alerts');
             });
-        };
+        }
         
-        setupChatListeners = () => {
+        function setupChatListeners() {
             socket.on('chat message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
             socket.on('private-message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
             socket.on('request-alert-confirmation', alertData => { if (confirm("Hemos detectado que podrías estar en una situación de riesgo.\n\n¿Deseas notificar a un administrador?")) { socket.emit('alert-confirmed', alertData); } });
@@ -208,19 +178,20 @@
                 document.getElementById('content-box').innerHTML = '';
                 addMessage('Sistema', 'Estás en una conversación privada y segura.');
             });
-        };
-
-        renderAlerts = (alerts) => {
+        }
+        
+        // --- FUNCIONES DE RENDERIZADO Y LÓGICA DE CHAT ---
+        function renderAlerts(alerts) {
             const contentBox = document.getElementById('content-box');
             contentBox.innerHTML = '';
             if (alerts.length === 0) {
                 contentBox.innerHTML = '<div id="no-alerts-msg" class="text-gray-400">No hay alertas pendientes.</div>';
-            } else {
-                alerts.forEach(alert => renderSingleAlert(alert));
+                return;
             }
-        };
+            alerts.forEach(alert => renderSingleAlert(alert));
+        }
 
-        renderSingleAlert = (alert, prepend = false) => {
+        function renderSingleAlert(alert, prepend = false) {
             const contentBox = document.getElementById('content-box');
             const alertElement = document.createElement('div');
             alertElement.classList.add('p-3', 'mb-2', 'border-b', 'border-gray-600', 'flex', 'justify-between', 'items-center');
@@ -232,9 +203,9 @@
                 contentBox.innerHTML = `<div class="text-yellow-400">Conectando con ${alert.userId}...</div>`;
             });
             if (prepend) contentBox.prepend(alertElement); else contentBox.appendChild(alertElement);
-        };
+        }
 
-        addMessage = (senderId, message) => {
+        function addMessage(senderId, message) {
             const contentBox = document.getElementById('content-box');
             const messageElement = document.createElement('div');
             messageElement.classList.add('p-2', 'mb-2', 'rounded-lg', 'max-w-[80%]', 'break-words', 'self-start');
@@ -243,9 +214,9 @@
             messageElement.innerHTML = `<strong class="text-xs opacity-75 block">${senderId}</strong>${message}`;
             contentBox.appendChild(messageElement);
             contentBox.scrollTop = contentBox.scrollHeight;
-        };
+        }
 
-        sendMessage = () => {
+        function sendMessage() {
             const messageInput = document.getElementById('message-input');
             const message = messageInput.value.trim();
             if (!message) return;
@@ -256,18 +227,79 @@
                 socket.emit('chat message', { message, senderId: currentUserId });
             }
             messageInput.value = '';
-        };
+        }
 
-        setupVisualFeatures = () => {
+        // --- FUNCIONES VISUALES (REINTEGRADAS) ---
+        function setupVisualFeatures() {
             const sendButton = document.getElementById('send-button');
             const quickExitButton = document.getElementById('quick-exit-button');
             const headerContainer = document.getElementById('header-container');
-
-            quickExitButton.addEventListener('click', () => { window.location.href = 'https://www.google.com'; });
-            headerContainer.innerHTML = '<a href="/?login=true" class="bg-teal-600 text-white py-1 px-3 rounded-lg text-sm hover:bg-teal-700">Acceso Profesional</a>';
             
-            // ... (resto de las funciones visuales que quieras reintegrar: emojis, partículas, botones predefinidos)
-        };
+            // Botón de acceso profesional
+            headerContainer.innerHTML = '<a href="/?login=true" class="bg-teal-600 text-white py-1 px-3 rounded-lg text-sm hover:bg-teal-700">Acceso Profesional</a>';
+
+            // Botones predefinidos
+            const predefinedMessagesLeft = document.createElement('div');
+            predefinedMessagesLeft.classList.add('hidden', 'md:flex', 'fixed', 'top-1/2', 'left-4', 'transform', '-translate-y-1/2', 'flex-col', 'gap-2', 'z-10');
+            const predefinedMessagesBottom = document.createElement('div');
+            predefinedMessagesBottom.classList.add('hidden', 'md:flex', 'fixed', 'bottom-4', 'left-1/2', 'transform', '-translate-x-1/2', 'flex-col', 'gap-2', 'z-10');
+            const predefinedMessagesRight = document.createElement('div');
+            predefinedMessagesRight.classList.add('hidden', 'md:flex', 'fixed', 'top-1/2', 'right-4', 'transform', '-translate-y-1/2', 'flex-col', 'gap-2', 'z-10');
+            const predefinedMessages = [
+                { text: "Estoy sufriendo acoso", container: predefinedMessagesLeft },
+                { text: "Sufro maltrato", container: predefinedMessagesBottom },
+                { text: "Me hacen bullying", container: predefinedMessagesRight }
+            ];
+            predefinedMessages.forEach(({ text, container }) => {
+                const messageButton = document.createElement('button');
+                messageButton.textContent = text;
+                messageButton.classList.add('bg-teal-500', 'text-white', 'p-3', 'rounded-lg', 'hover:bg-teal-600', 'focus:outline-none', 'text-sm', 'shadow-lg');
+                if (container === predefinedMessagesBottom) messageButton.classList.add('text-lg', 'p-4');
+                messageButton.addEventListener('click', () => {
+                    sendMessage(text);
+                });
+                container.appendChild(messageButton);
+            });
+            document.body.appendChild(predefinedMessagesLeft);
+            document.body.appendChild(predefinedMessagesBottom);
+            document.body.appendChild(predefinedMessagesRight);
+
+            // Botón y panel de Emojis
+            const emojiButton = document.createElement('button');
+            emojiButton.textContent = '😊';
+            emojiButton.classList.add('bg-yellow-500', 'text-white', 'p-3', 'rounded-lg', 'ml-2', 'hover:bg-yellow-600', 'focus:outline-none');
+            sendButton.parentNode.insertBefore(emojiButton, sendButton.nextSibling);
+            const emojiContainer = document.createElement('div');
+            emojiContainer.classList.add('absolute', 'bg-gray-800', 'p-3', 'rounded-lg', 'shadow-lg', 'hidden', 'z-10');
+            document.body.appendChild(emojiContainer);
+            const emojis = ['😊', '😂', '❤️', '👍', '😢', '😡', '🎉', '🙏'];
+            emojis.forEach(emoji => {
+                const emojiOption = document.createElement('button');
+                emojiOption.textContent = emoji;
+                emojiOption.classList.add('text-xl', 'p-2', 'hover:bg-gray-700', 'rounded');
+                emojiOption.addEventListener('click', () => {
+                    document.getElementById('message-input').value += emoji;
+                    emojiContainer.style.display = 'none';
+                });
+                emojiContainer.appendChild(emojiOption);
+            });
+            emojiButton.addEventListener('click', (e) => {
+                const isHidden = emojiContainer.style.display === 'none' || emojiContainer.style.display === '';
+                emojiContainer.style.display = isHidden ? 'block' : 'none';
+                if (isHidden) {
+                    const rect = emojiButton.getBoundingClientRect();
+                    emojiContainer.style.top = `${rect.bottom + window.scrollY}px`;
+                    emojiContainer.style.left = 'auto';
+                    emojiContainer.style.right = `${window.innerWidth - rect.right}px`;
+                }
+            });
+            document.body.addEventListener('click', (e) => {
+                if (!emojiContainer.contains(e.target) && e.target !== emojiButton) {
+                    emojiContainer.style.display = 'none';
+                }
+            });
+        }
+        
     </script>
 </body>
 </html>
