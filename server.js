@@ -16,11 +16,10 @@ const languageClient = new language.LanguageServiceClient();
 const mongoClient = new MongoClient(mongoUri);
 
 let db;
-// Nos conectamos y guardamos la conexión para que la use toda la app
 const clientPromise = mongoClient.connect().then(client => {
     console.log('Conectado a la base de datos de MongoDB Atlas');
     db = client.db('chat_anonimo');
-    return client; // Devolvemos el cliente para que connect-mongo lo use
+    return client;
 }).catch(err => console.error('Error al conectar a MongoDB:', err));
 
 const app = express();
@@ -33,11 +32,10 @@ const sessionMiddleware = session({
     secret: 'mi_secreto_de_sesion_super_seguro_cambiar',
     resave: false,
     saveUninitialized: false,
-    // --- CAMBIO CLAVE: Usamos la misma conexión de MongoDB para todo ---
+    // --- CORRECCIÓN FINAL ---
     store: MongoStore.create({
-        clientPromise: clientPromise, // Le pasamos la promesa de conexión
-        dbName: 'chat_anonimo',
-        ttl: 14 * 24 * 60 * 60 // 14 días
+        clientPromise: clientPromise, // Usamos la promesa de conexión compartida
+        ttl: 14 * 24 * 60 * 60,       // Y quitamos el dbName que generaba conflicto
     }),
     cookie: {
         secure: process.env.NODE_ENV === 'production'
@@ -50,28 +48,32 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static(__dirname));
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
 
-// --- Rutas de Autenticación (con los logs de depuración, por si acaso) ---
-app.post('/login', async (req, res) => {
-    console.log('--- [DEBUG] INICIO DE LOGIN ---');
-    const { email, password } = req.body;
-    if (!db) {
-        console.log('[DEBUG] LOGIN ERROR: Base de datos no conectada.');
-        return res.status(500).json({ message: 'Error del servidor.' });
+// --- Rutas de Autenticación ---
+app.post('/register', async (req, res) => {
+    const { email, password, fullName, specialty } = req.body;
+    if (!db) return res.status(500).json({ message: 'Error del servidor.' });
+    const existingProfessional = await db.collection('professionals').findOne({ email });
+    if (existingProfessional) return res.status(400).json({ message: 'El email ya está registrado.' });
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    const newProfessional = { email, password: hashedPassword, fullName, specialty, createdAt: new Date() };
+    try {
+        await db.collection('professionals').insertOne(newProfessional);
+        res.status(201).json({ success: true, message: 'Profesional registrado con éxito.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error al registrar el profesional.' });
     }
+});
+
+app.post('/login', async (req, res) => {
+    const { email, password } = req.body;
+    if (!db) return res.status(500).json({ message: 'Error del servidor.' });
 
     const professional = await db.collection('professionals').findOne({ email });
-    if (!professional) {
-        console.log(`[DEBUG] LOGIN FALLIDO: Profesional con email ${email} no encontrado.`);
-        return res.status(401).json({ message: 'Credenciales incorrectas.' });
-    }
-    console.log('[DEBUG] LOGIN: Profesional encontrado:', professional.fullName);
+    if (!professional) return res.status(401).json({ message: 'Credenciales incorrectas.' });
 
     const isMatch = await bcrypt.compare(password, professional.password);
-    if (!isMatch) {
-        console.log(`[DEBUG] LOGIN FALLIDO: Contraseña incorrecta para ${email}.`);
-        return res.status(401).json({ message: 'Credenciales incorrectas.' });
-    }
-    console.log('[DEBUG] LOGIN: Contraseña correcta.');
+    if (!isMatch) return res.status(401).json({ message: 'Credenciales incorrectas.' });
 
     const professionalInfo = { 
         id: professional._id.toString(), 
@@ -80,62 +82,20 @@ app.post('/login', async (req, res) => {
     };
 
     req.session.regenerate(err => {
-        if (err) {
-            console.error('[DEBUG] LOGIN ERROR: Fallo al regenerar la sesión:', err);
-            return res.status(500).json({ message: 'Error del servidor durante el login.' });
-        }
-        console.log('[DEBUG] LOGIN: Sesión regenerada. Nueva Session ID:', req.session.id);
-
+        if (err) return res.status(500).json({ message: 'Error del servidor durante el login.' });
         req.session.professional = professionalInfo;
-        console.log('[DEBUG] LOGIN: Datos del profesional guardados en la nueva sesión:', req.session.professional);
-
         req.session.save(saveErr => {
-            if (saveErr) {
-                console.error('[DEBUG] LOGIN ERROR: Fallo al guardar la sesión en la DB:', saveErr);
-                return res.status(500).json({ message: 'Error del servidor durante el login.' });
-            }
-            console.log('[DEBUG] LOGIN: Nueva sesión guardada en la DB con éxito.');
-            console.log('[DEBUG] LOGIN: Enviando respuesta exitosa al cliente.');
+            if (saveErr) return res.status(500).json({ message: 'Error del servidor durante el login.' });
             res.json({ success: true, professional: req.session.professional });
         });
     });
 });
 
 app.get('/check-session', (req, res) => {
-    console.log('--- [DEBUG] INICIO DE CHECK-SESSION ---');
-    console.log('[DEBUG] CHECK-SESSION: Session ID actual:', req.session.id);
-    console.log('[DEBUG] CHECK-SESSION: Objeto de sesión completo:', JSON.stringify(req.session, null, 2));
-    
     if (req.session && req.session.professional) {
-        console.log('[DEBUG] CHECK-SESSION: Profesional ENCONTRADO en la sesión:', req.session.professional.fullName);
         res.json({ loggedIn: true, professional: req.session.professional });
     } else {
-        console.log('[DEBUG] CHECK-SESSION: Profesional NO encontrado en la sesión.');
         res.json({ loggedIn: false });
-    }
-});
-
-// El resto del archivo (logout, socket.io, etc.) no necesita cambios
-// y puede quedar como está en tu versión anterior. Lo incluyo para que
-// tengas el archivo completo y no haya dudas.
-
-app.post('/register', async (req, res) => {
-    const { email, password, fullName, specialty } = req.body;
-    if (!db) return res.status(500).json({ message: 'Error del servidor.' });
-
-    const existingProfessional = await db.collection('professionals').findOne({ email });
-    if (existingProfessional) return res.status(400).json({ message: 'El email ya está registrado.' });
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const newProfessional = { email, password: hashedPassword, fullName, specialty, createdAt: new Date() };
-    
-    try {
-        await db.collection('professionals').insertOne(newProfessional);
-        res.status(201).json({ success: true, message: 'Profesional registrado con éxito.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Error al registrar el profesional.' });
     }
 });
 
@@ -147,11 +107,11 @@ app.post('/logout', (req, res) => {
     });
 });
 
+// --- Lógica de Socket.IO ---
 let liveUsers = {};
 
 io.on('connection', (socket) => {
     const session = socket.request.session;
-
     if (session && session.professional) {
         console.log(`Un profesional (${session.professional.fullName}) se ha conectado: ${socket.id}`);
         socket.join('admin-room');
@@ -164,7 +124,6 @@ io.on('connection', (socket) => {
     socket.on('admin-request-alerts', async () => {
         socket.request.session.reload(async (err) => {
             if (err) return console.error("Error recargando sesión en socket:", err);
-            
             if (socket.request.session && socket.request.session.professional) {
                 try {
                     const alerts = await db.collection('alerts').find({ status: 'pendiente' }).sort({ timestamp: -1 }).toArray();
@@ -185,7 +144,6 @@ io.on('connection', (socket) => {
                 io.emit('chat message', data);
             }
         } catch (error) {
-            console.error('ERROR con IA:', error);
             io.emit('chat message', data);
         }
     });
@@ -216,9 +174,7 @@ io.on('connection', (socket) => {
             socket.join(privateRoomId);
             userSocket.join(privateRoomId);
             await db.collection('alerts').updateOne({ _id: new ObjectId(alertId) }, { $set: { status: 'activa', attendedBy: professionalFullName } });
-            
             socket.to('admin-room').emit('alert-claimed', { alertId: alertId });
-
             socket.emit('private-session-started', { roomId: privateRoomId, user: targetUserId });
             userSocket.emit('private-session-started', { roomId: privateRoomId, user: professionalFullName });
         } else {
