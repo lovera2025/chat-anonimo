@@ -61,24 +61,9 @@
                      <button id="quick-exit-button" class="bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 focus:outline-none text-sm">Salida Rápida</button>
                 </div>
             </div>`;
-        
-        // --- LÓGICA DE INICIALIZACIÓN ---
-        window.onload = function() {
-            fetch('/check-session').then(res => res.json()).then(data => {
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('login')) {
-                    showLogin();
-                } else if (urlParams.get('register')) {
-                    showRegister();
-                } else if (data.loggedIn) {
-                    loadApp(data.professional);
-                } else {
-                    loadApp(null);
-                }
-            });
-        };
 
-        // --- MANEJO DE VISTAS ---
+        // --- MANEJO DE VISTAS Y ESTADO ---
+
         function showLogin() {
             appContainer.innerHTML = loginTemplate;
             document.getElementById('login-form').addEventListener('submit', handleLogin);
@@ -90,6 +75,43 @@
             document.getElementById('register-form').addEventListener('submit', handleRegister);
             document.getElementById('login-link').addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
         }
+
+        function loadApp(professional) {
+            const isAdmin = !!professional;
+            appContainer.innerHTML = chatTemplate;
+            if (isAdmin) {
+                currentUserId = professional.fullName;
+                loadAdminPanel(professional);
+            } else {
+                loadUserChat();
+            }
+        }
+
+        function loadUserChat() {
+            socket.emit('register-user', currentUserId);
+            document.getElementById('main-title').textContent = 'Ayuda Anónima';
+            document.getElementById('content-box').innerHTML = `<div class="text-center text-gray-400 italic">¡Bienvenido! Estás conectado como ${currentUserId}.</div>`;
+            setupCommonListeners();
+            setupVisualFeatures();
+        }
+
+        function loadAdminPanel(professional) {
+            socket.emit('register-user', 'ADMINISTRADOR');
+            document.getElementById('main-title').textContent = `Panel de Alertas - ${professional.fullName}`;
+            document.getElementById('input-area').style.display = 'none';
+            document.getElementById('footer-buttons').style.display = 'none';
+            document.getElementById('header-container').innerHTML = '<button id="logout-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded text-sm">Cerrar Sesión</button>';
+            document.getElementById('logout-btn').addEventListener('click', async () => {
+                await fetch('/logout', { method: 'POST' });
+                window.location.href = '/';
+            });
+            document.getElementById('content-box').innerHTML = '<div class="text-yellow-400">Cargando historial...</div>';
+            socket.emit('admin-request-alerts');
+            setupAdminListeners();
+            setupCommonListeners(true);
+        }
+
+        // --- MANEJO DE EVENTOS Y LÓGICA ---
 
         async function handleLogin(e) {
             e.preventDefault();
@@ -118,44 +140,6 @@
             }
         }
         
-        // --- LÓGICA DE CARGA DE LA APP ---
-        function loadApp(professional) {
-            const isAdmin = !!professional;
-            if(isAdmin) { currentUserId = professional.fullName; }
-            appContainer.innerHTML = chatTemplate;
-            
-            if (isAdmin) {
-                loadAdminPanel(professional);
-            } else {
-                loadUserChat();
-            }
-            setupChatListeners();
-        }
-
-        function loadUserChat() {
-            socket.emit('register-user', currentUserId);
-            const mainTitle = document.getElementById('main-title');
-            mainTitle.textContent = 'Ayuda Anónima';
-            document.getElementById('content-box').innerHTML = `<div class="text-center text-gray-400 italic">¡Bienvenido! Estás conectado como ${currentUserId}.</div>`;
-            setupVisualFeatures();
-        }
-
-        function loadAdminPanel(professional) {
-            socket.emit('register-user', 'ADMINISTRADOR');
-            document.getElementById('main-title').textContent = `Panel de Alertas - ${professional.fullName}`;
-            document.getElementById('input-area').style.display = 'none';
-            document.getElementById('footer-buttons').style.display = 'none';
-            document.getElementById('header-container').innerHTML = '<button id="logout-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded text-sm">Cerrar Sesión</button>';
-            document.getElementById('logout-btn').addEventListener('click', async () => {
-                await fetch('/logout', { method: 'POST' });
-                window.location.href = '/';
-            });
-            document.getElementById('content-box').innerHTML = '<div class="text-yellow-400">Cargando historial...</div>';
-            socket.emit('admin-request-alerts');
-            setupAdminListeners();
-        }
-        
-        // --- LISTENERS DE SOCKETS ---
         function setupAdminListeners() {
             socket.on('alert-history', renderAlerts);
             socket.on('new-alert-in-queue', newAlert => {
@@ -172,8 +156,10 @@
         function setupChatListeners() {
             const sendButton = document.getElementById('send-button');
             const messageInput = document.getElementById('message-input');
-            sendButton.addEventListener('click', sendMessage);
-            messageInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
+            if(sendButton && messageInput) {
+                sendButton.addEventListener('click', sendMessage);
+                messageInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
+            }
 
             socket.on('chat message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
             socket.on('private-message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
@@ -192,7 +178,7 @@
             });
         }
 
-        // --- FUNCIONES DE RENDERIZADO ---
+        // --- FUNCIONES DE RENDERIZADO Y MENSAJERÍA ---
         function renderAlerts(alerts) {
             const contentBox = document.getElementById('content-box');
             contentBox.innerHTML = '';
@@ -217,10 +203,9 @@
             if (prepend) contentBox.prepend(alertElement); else contentBox.appendChild(alertElement);
         }
 
-        // --- FUNCIONES DE MENSAJERÍA ---
         function addMessage(senderId, message) {
             const contentBox = document.getElementById('content-box');
-            if(!contentBox) return;
+            if (!contentBox) return;
             const messageElement = document.createElement('div');
             messageElement.classList.add('p-2', 'mb-2', 'rounded-lg', 'max-w-[80%]', 'break-words', 'self-start');
             if (senderId === currentUserId) messageElement.classList.replace('self-start', 'self-end');
@@ -246,26 +231,43 @@
         // --- FUNCIONES VISUALES (REINTEGRADAS) ---
         function setupVisualFeatures() {
             const sendButton = document.getElementById('send-button');
-            const quickExitButton = document.getElementById('quick-exit-button');
             const headerContainer = document.getElementById('header-container');
-
-            headerContainer.innerHTML = '<a href="/?login=true" class="bg-teal-600 text-white py-1 px-3 rounded-lg text-sm hover:bg-teal-700">Acceso Profesional</a>';
+            const quickExitButton = document.getElementById('quick-exit-button');
             quickExitButton.addEventListener('click', () => { window.location.href = 'https://www.google.com'; });
+            
+            headerContainer.innerHTML = '<a href="/?login=true" class="bg-teal-600 text-white py-1 px-3 rounded-lg text-sm hover:bg-teal-700">Acceso Profesional</a>';
+            
+            const headerInfo = document.createElement('div');
+            headerInfo.classList.add('hidden', 'md:block', 'absolute', 'top-4', 'left-4', 'text-sm', 'text-gray-300', 'bg-gray-800', 'p-2', 'rounded-lg', 'shadow-md');
+            headerInfo.textContent = 'Comunicate al 102 o 137 si sufris acoso, maltrato o bullying.';
+            document.body.appendChild(headerInfo);
 
-            const predefinedMessagesLeft = document.createElement('div');
-            predefinedMessagesLeft.classList.add('hidden', 'md:flex', 'fixed', 'top-1/2', 'left-4', 'transform', '-translate-y-1/2', 'flex-col', 'gap-2', 'z-10');
-            const predefinedMessages = [{ text: "Estoy sufriendo acoso", container: predefinedMessagesLeft }];
-            predefinedMessages.forEach(({ text, container }) => {
+            const predefinedMessages = [
+                { text: "Estoy sufriendo acoso", position: 'left-4' },
+                { text: "Sufro maltrato", position: 'bottom-4' },
+                { text: "Me hacen bullying", position: 'right-4' }
+            ];
+            predefinedMessages.forEach(({ text, position }) => {
+                const container = document.createElement('div');
+                let classes = ['hidden', 'md:flex', 'fixed', 'flex-col', 'gap-2', 'z-10'];
+                if(position.includes('left') || position.includes('right')) classes.push('top-1/2', 'transform', '-translate-y-1/2');
+                if(position.includes('bottom')) classes.push('left-1/2', 'transform', '-translate-x-1/2');
+                if(position.includes('left-4')) classes.push('left-4');
+                if(position.includes('right-4')) classes.push('right-4');
+                if(position.includes('bottom-4')) classes.push('bottom-4');
+                container.classList.add(...classes);
+                
                 const messageButton = document.createElement('button');
                 messageButton.textContent = text;
                 messageButton.classList.add('bg-teal-500', 'text-white', 'p-3', 'rounded-lg', 'hover:bg-teal-600', 'text-sm', 'shadow-lg');
+                if (position === 'bottom-4') messageButton.classList.add('text-lg', 'p-4');
                 messageButton.addEventListener('click', () => {
                     document.getElementById('message-input').value = text;
                     sendMessage();
                 });
                 container.appendChild(messageButton);
+                document.body.appendChild(container);
             });
-            document.body.appendChild(predefinedMessagesLeft);
 
             const emojiButton = document.createElement('button');
             emojiButton.textContent = '😊';
@@ -300,7 +302,7 @@
                     emojiContainer.style.display = 'none';
                 }
             });
-            
+
             const backgroundCanvas = document.getElementById('background-canvas');
             const ctx = backgroundCanvas.getContext('2d');
             let width, height;
@@ -310,17 +312,9 @@
                 height = backgroundCanvas.height = window.innerHeight;
                 particles.length = 0;
                 for(let i=0; i<100; i++) {
-                    particles.push({
-                        x: Math.random() * width, y: Math.random() * height,
-                        size: Math.random() * 3 + 1,
-                        dx: Math.random() * 0.5 - 0.25, dy: Math.random() * 0.5 - 0.25,
-                        opacity: Math.random() * 0.5 + 0.2
-                    });
+                    particles.push({ x: Math.random() * width, y: Math.random() * height, size: Math.random() * 3 + 1, dx: Math.random() * 0.5 - 0.25, dy: Math.random() * 0.5 - 0.25, opacity: Math.random() * 0.5 + 0.2 });
                 }
             }
-            window.addEventListener('resize', resizeCanvas);
-            resizeCanvas();
-
             function animateParticles() {
                 ctx.clearRect(0, 0, width, height);
                 particles.forEach(p => {
@@ -328,15 +322,19 @@
                     ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
                     ctx.fillStyle = `rgba(255, 255, 255, ${p.opacity})`;
                     ctx.fill();
-                    p.x += p.dx;
-                    p.y += p.dy;
+                    p.x += p.dx; p.y += p.dy;
                     if (p.x < 0 || p.x > width) p.dx *= -1;
                     if (p.y < 0 || p.y > height) p.dy *= -1;
                 });
                 requestAnimationFrame(animateParticles);
             }
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
             animateParticles();
         }
+
+        // --- INICIALIZACIÓN ---
+        window.onload();
     </script>
 </body>
 </html>
