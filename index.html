@@ -21,7 +21,7 @@
         const appContainer = document.getElementById('app-container');
         let currentUserId = 'Usuario' + Math.floor(Math.random() * 10000);
         let currentRoomId = null;
-        let IS_ADMIN = false; // Variable para saber si el usuario es un profesional
+        let IS_ADMIN = false;
 
         // --- PLANTILLAS HTML ---
         const loginTemplate = `
@@ -30,7 +30,7 @@
                 <form id="login-form">
                     <div class="mb-4"><label class="block text-gray-300 text-sm font-bold mb-2" for="email">Email</label><input class="shadow appearance-none border rounded w-full py-2 px-3 bg-gray-700 text-white focus:outline-none" id="email" type="email" required></div>
                     <div class="mb-6"><label class="block text-gray-300 text-sm font-bold mb-2" for="password">Contraseña</label><input class="shadow appearance-none border rounded w-full py-2 px-3 bg-gray-700 text-white mb-3 focus:outline-none" id="password" type="password" required></div>
-                    <div class="flex items-center justify-between"><button type="button" id="login-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Iniciar Sesión</button><a href="#" id="register-link" class="inline-block align-baseline font-bold text-sm text-teal-400 hover:text-teal-200">Registrarse</a></div>
+                    <div class="flex items-center justify-between"><button type="button" id="login-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-transform duration-200 ease-in-out hover:scale-105">Iniciar Sesión</button><a href="#" id="register-link" class="inline-block align-baseline font-bold text-sm text-teal-400 hover:text-teal-200">Registrarse</a></div>
                     <p id="form-message" class="text-red-500 text-xs italic mt-4"></p>
                 </form>
                 <div class="text-center mt-6"><a href="/" class="text-sm text-gray-400 hover:text-white">Ir al Chat Público &rarr;</a></div>
@@ -44,7 +44,7 @@
                     <div class="mb-4"><label for="specialty" class="block text-gray-300 text-sm font-bold mb-2">Especialidad</label><input class="shadow w-full py-2 px-3 bg-gray-700 rounded" id="specialty" type="text" required></div>
                     <div class="mb-4"><label for="email" class="block text-gray-300 text-sm font-bold mb-2">Email</label><input class="shadow w-full py-2 px-3 bg-gray-700 rounded" id="email" type="email" required></div>
                     <div class="mb-6"><label for="password" class="block text-gray-300 text-sm font-bold mb-2">Contraseña</label><input class="shadow w-full py-2 px-3 bg-gray-700 rounded" id="password" type="password" required></div>
-                    <div class="flex items-center justify-between"><button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Registrar Cuenta</button><a href="#" id="login-link" class="inline-block align-baseline font-bold text-sm text-teal-400 hover:text-teal-200">Ya tengo cuenta</a></div>
+                    <div class="flex items-center justify-between"><button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-transform duration-200 ease-in-out hover:scale-105">Registrar Cuenta</button><a href="#" id="login-link" class="inline-block align-baseline font-bold text-sm text-teal-400 hover:text-teal-200">Ya tengo cuenta</a></div>
                     <p id="form-message" class="text-xs italic mt-4"></p>
                 </form>
             </div>`;
@@ -56,10 +56,10 @@
                 <div id="content-box" class="border border-gray-700 rounded-lg p-4 mb-4 bg-gray-700 min-h-[400px]"></div>
                 <div id="input-area" class="flex">
                     <input type="text" id="message-input" class="flex-grow p-3 rounded-l-lg bg-gray-600 text-white focus:outline-none" placeholder="Escribe tu mensaje...">
-                    <button id="send-button" class="bg-teal-500 text-white p-3 rounded-r-lg">Enviar</button>
+                    <button id="send-button" class="bg-teal-500 text-white p-3 rounded-r-lg transition-transform duration-200 ease-in-out hover:scale-105">Enviar</button>
                 </div>
                 <div id="footer-area" class="text-center mt-4 space-y-3">
-                     <button id="quick-exit-button" class="bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 focus:outline-none text-sm">Salida Rápida</button>
+                     <button id="quick-exit-button" class="bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 focus:outline-none text-sm transition-transform duration-200 ease-in-out hover:scale-105">Salida Rápida</button>
                      <div id="professional-login-link-container"></div>
                 </div>
             </div>`;
@@ -132,14 +132,14 @@
             document.getElementById('main-title').textContent = `Panel de Alertas - ${professional.fullName}`;
             document.getElementById('input-area').style.display = 'none';
             const footerArea = document.getElementById('footer-area');
-            footerArea.innerHTML = '<button id="logout-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">Cerrar Sesión</button>';
+            footerArea.innerHTML = '<button id="logout-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition-transform duration-200 ease-in-out hover:scale-105">Cerrar Sesión</button>';
             document.getElementById('logout-btn').addEventListener('click', async () => {
                 await fetch('/logout', { method: 'POST' });
                 window.location.href = '/';
             });
             const contentBox = document.getElementById('content-box');
             contentBox.innerHTML = `<div class="flex justify-center items-center h-full">
-                                      <button id="load-alerts-btn" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-lg text-lg">
+                                      <button id="load-alerts-btn" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-lg text-lg transition-transform duration-200 ease-in-out hover:scale-105">
                                         Ver Alertas Pendientes
                                       </button>
                                     </div>`;
@@ -224,7 +224,7 @@
                     <p class="text-sm text-gray-300 italic">"${alert.message}"</p>
                     <p class="text-xs text-gray-500 mt-1">${new Date(alert.timestamp).toLocaleString()}</p>
                 </div>
-                <button class="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-2 rounded text-sm connect-btn">Atender</button>`;
+                <button class="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-2 rounded text-sm connect-btn transition-transform duration-200 ease-in-out hover:scale-105">Atender</button>`;
             alertElement.querySelector('.connect-btn').addEventListener('click', () => {
                 socket.emit('admin-connect-to-user', { alertId: alert._id, targetUserId: alert.userId });
             });
@@ -266,7 +266,7 @@
             const emojiButton = document.createElement('button');
             emojiButton.id = 'emoji-btn';
             emojiButton.textContent = '😊';
-            emojiButton.classList.add('bg-yellow-500', 'text-white', 'p-3', 'rounded-lg', 'ml-2', 'hover:bg-yellow-600');
+            emojiButton.classList.add('bg-yellow-500', 'text-white', 'p-3', 'rounded-lg', 'ml-2', 'hover:bg-yellow-600', 'transition-transform', 'duration-200', 'ease-in-out', 'hover:scale-105');
             sendButton.parentNode.insertBefore(emojiButton, sendButton.nextSibling);
             const emojiContainer = document.createElement('div');
             emojiContainer.classList.add('absolute', 'bg-gray-800', 'p-3', 'rounded-lg', 'shadow-lg', 'hidden', 'z-10');
@@ -307,12 +307,10 @@
 
             const messageInput = document.getElementById('message-input');
 
-            // Función auxiliar para crear y posicionar un botón de acceso rápido
             const createShortcutButton = (text, positionClasses) => {
                 const button = document.createElement('button');
                 button.textContent = text;
-                // CAMBIO: Color de fondo ajustado para coincidir con la imagen
-                button.className = `fixed ${positionClasses} bg-teal-600 text-white py-2 px-4 rounded-lg shadow-lg hover:bg-teal-700 focus:outline-none text-sm z-20`;
+                button.className = `fixed ${positionClasses} bg-teal-600 text-white py-2 px-4 rounded-lg shadow-lg hover:bg-teal-700 focus:outline-none text-sm z-20 transition-transform duration-200 ease-in-out hover:scale-105`;
                 
                 button.addEventListener('click', () => {
                     if (messageInput) {
@@ -323,24 +321,19 @@
                 document.body.appendChild(button);
             };
 
-            // Nos aseguramos de que solo los usuarios normales vean estos elementos
             if (!IS_ADMIN) {
-                // NUEVO: Aviso en la esquina superior izquierda
                 const helpNotice = document.createElement('p');
                 helpNotice.textContent = 'Comunicate al 102 o 137 si sufris acoso, maltrato o bullying.';
                 helpNotice.className = 'fixed top-4 left-4 text-gray-300 text-sm z-20';
                 document.body.appendChild(helpNotice);
 
-                // CAMBIO: Nuevas clases de posición para los botones
                 createShortcutButton('Estoy sufriendo acoso', 'top-1/2 -translate-y-1/2 left-4');
                 createShortcutButton('Me hacen bullying', 'top-1/2 -translate-y-1/2 right-4');
                 createShortcutButton('Sufro maltrato', 'bottom-10 left-1/2 -translate-x-1/2');
                 
-                // Se configura la función de emojis para el usuario
                 setupEmojiFeature();
             }
             
-            // Lógica para el fondo animado
             const backgroundCanvas = document.getElementById('background-canvas');
             if(backgroundCanvas) {
                 const ctx = backgroundCanvas.getContext('2d');
