@@ -77,16 +77,31 @@ app.post('/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, professional.password);
     if (!isMatch) return res.status(401).json({ message: 'Credenciales incorrectas.' });
 
-    req.session.professional = { id: professional._id.toString(), email: professional.email, fullName: professional.fullName };
-    
-    // --- CAMBIO IMPORTANTE: Guardamos la sesión manualmente antes de responder ---
-    req.session.save(err => {
+    // Preparamos la info del profesional para guardarla
+    const professionalInfo = { 
+        id: professional._id.toString(), 
+        email: professional.email, 
+        fullName: professional.fullName 
+    };
+
+    // --- CAMBIO CLAVE: Regeneramos la sesión ---
+    req.session.regenerate(err => {
         if (err) {
-            console.error('Error al guardar sesión:', err);
-            return res.status(500).json({ message: 'Error al guardar la sesión.' });
+            console.error('Error al regenerar la sesión:', err);
+            return res.status(500).json({ message: 'Error del servidor durante el login.' });
         }
-        // Solo respondemos cuando estamos seguros de que se guardó
-        res.json({ success: true, professional: req.session.professional });
+
+        // Ahora, en la sesión NUEVA y LIMPIA, guardamos los datos
+        req.session.professional = professionalInfo;
+
+        // Guardamos esta nueva sesión y luego respondemos
+        req.session.save(saveErr => {
+            if (saveErr) {
+                console.error('Error al guardar la nueva sesión regenerada:', saveErr);
+                return res.status(500).json({ message: 'Error del servidor durante el login.' });
+            }
+            res.json({ success: true, professional: req.session.professional });
+        });
     });
 });
 
@@ -106,7 +121,7 @@ app.post('/logout', (req, res) => {
     });
 });
 
-// --- Lógica de Socket.IO ---
+// --- Lógica de Socket.IO (sin cambios respecto a la versión anterior) ---
 let liveUsers = {};
 let adminSockets = [];
 
@@ -115,9 +130,7 @@ io.on('connection', (socket) => {
 
     if (session && session.professional) {
         console.log(`Un profesional (${session.professional.fullName}) se ha conectado: ${socket.id}`);
-        adminSockets.push(socket.id);
         socket.join('admin-room');
-        socket.emit('admin-welcome', session.professional);
     } else {
         console.log(`Un usuario se ha conectado: ${socket.id}`);
     }
@@ -127,7 +140,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('admin-request-alerts', async () => {
-        // Recargamos la sesión para asegurarnos de tener la data más reciente
         socket.request.session.reload(async (err) => {
             if (err) return console.error("Error recargando sesión en socket:", err);
             
@@ -205,11 +217,7 @@ io.on('connection', (socket) => {
                 break;
             }
         }
-        const adminIndex = adminSockets.indexOf(socket.id);
-        if (adminIndex > -1) {
-            adminSockets.splice(adminIndex, 1);
-            console.log(`Un profesional se ha desconectado: ${socket.id}`);
-        }
+        // No es necesario mantener el array adminSockets si usamos rooms
     });
 });
 
