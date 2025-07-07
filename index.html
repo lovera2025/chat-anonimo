@@ -69,6 +69,9 @@
                 <div id="header-container" class="absolute top-4 right-4 flex gap-2 items-center"></div>
                 <h1 id="main-title" class="text-2xl font-bold text-center mb-6 text-teal-400"></h1>
                 <div id="content-box" class="border border-gray-700 rounded-lg p-4 mb-4 bg-gray-700 min-h-[400px]"></div>
+                
+                <div id="typing-indicator" class="text-gray-400 italic text-sm h-5 mb-1 px-1"></div>
+
                 <div id="input-area" class="flex">
                     <input type="text" id="message-input" class="flex-grow p-3 rounded-l-lg bg-gray-600 text-white focus:outline-none" placeholder="Escribe tu mensaje...">
                     <button id="send-button" class="bg-teal-500 text-white p-3 rounded-r-lg transition-transform duration-200 ease-in-out hover:scale-105">Enviar</button>
@@ -146,6 +149,7 @@
             socket.emit('register-user', 'ADMINISTRADOR');
             document.getElementById('main-title').textContent = `Panel de Alertas - ${professional.fullName}`;
             document.getElementById('input-area').style.display = 'none';
+            document.getElementById('typing-indicator').style.display = 'none'; // Ocultar para admin
             const footerArea = document.getElementById('footer-area');
             footerArea.innerHTML = '<button id="logout-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition-transform duration-200 ease-in-out hover:scale-105">Cerrar Sesión</button>';
             document.getElementById('logout-btn').addEventListener('click', async () => {
@@ -191,11 +195,50 @@
         function setupCommonListeners() {
             const sendButton = document.getElementById('send-button');
             const messageInput = document.getElementById('message-input');
+            
             if(sendButton && messageInput) {
                 sendButton.addEventListener('click', sendMessage);
                 messageInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
             }
+
+            // --- INICIO: LÓGICA DEL INDICADOR DE ESCRITURA ---
+            let typingTimer; 
+            const TYPING_TIMER_LENGTH = 1500;
+            let isTyping = false;
+
+            if (messageInput) {
+                messageInput.addEventListener('input', () => {
+                    if (!isTyping) {
+                        isTyping = true;
+                        socket.emit('typing', { roomId: currentRoomId, senderId: currentUserId });
+                    }
+                    clearTimeout(typingTimer);
+                    typingTimer = setTimeout(() => {
+                        isTyping = false;
+                        socket.emit('stop typing', { roomId: currentRoomId });
+                    }, TYPING_TIMER_LENGTH);
+                });
+            }
+
+            socket.on('typing', data => {
+                if (data.senderId !== currentUserId) {
+                    const typingIndicator = document.getElementById('typing-indicator');
+                    if (typingIndicator) {
+                        typingIndicator.textContent = `${data.senderId} está escribiendo...`;
+                    }
+                }
+            });
+
+            socket.on('stop typing', () => {
+                const typingIndicator = document.getElementById('typing-indicator');
+                if (typingIndicator) {
+                    typingIndicator.textContent = '';
+                }
+            });
+            // --- FIN: LÓGICA DEL INDICADOR DE ESCRITURA ---
+
             socket.on('private-message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
+            
             socket.on('private-session-started', data => {
                 currentRoomId = data.roomId;
                 document.getElementById('main-title').textContent = `Sesión Privada con ${data.user}`;
@@ -207,11 +250,13 @@
                     setupEmojiFeature();
                 }
             });
+
             if (!IS_ADMIN) {
                 socket.on('chat message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
                 socket.on('request-alert-confirmation', alertData => { if (confirm("Hemos detectado que podrías estar en una situación de riesgo.\n\n¿Deseas notificar a un administrador?")) { socket.emit('alert-confirmed', alertData); } });
                 socket.on('alert-queued', () => {
                     document.getElementById('input-area').style.display = 'none';
+                    document.getElementById('typing-indicator').style.display = 'none';
                     document.getElementById('footer-area').style.display = 'none';
                     document.getElementById('content-box').innerHTML = '<div class="text-center text-green-400 p-4">Tu petición fue enviada. Un administrador se conectará en cualquier momento. Por favor, no cierres esta ventana.</div>';
                 });
@@ -255,21 +300,16 @@
             const isCurrentUser = senderId === currentUserId;
             const senderDisplay = isCurrentUser ? 'Tú' : senderId;
 
-            // AÑADIDO: Clase para la animación y 'relative' para posicionar la cola
             messageElement.className = `message-bubble p-2 my-1 rounded-lg max-w-xs relative ${isCurrentUser ? 'bg-teal-600 self-end' : 'bg-gray-600 self-start'}`;
             
             messageElement.innerHTML = `<div class="font-semibold text-sm">${senderDisplay}</div><div>${message}</div>`;
 
-            // AÑADIDO: Lógica para crear la "cola" de la burbuja
             const tail = document.createElement('div');
             if (isCurrentUser) {
-                // Cola para el usuario (apunta desde la derecha)
                 tail.className = "absolute bottom-0 right-[-6px] w-0 h-0 border-l-[10px] border-l-transparent border-t-[10px] border-t-teal-600";
             } else {
-                // Cola para el otro participante (apunta desde la izquierda)
                 tail.className = "absolute bottom-0 left-[-6px] w-0 h-0 border-r-[10px] border-r-transparent border-t-[10px] border-t-gray-600";
             }
-            // Importante: La cola se debe añadir al elemento del mensaje para que se posicione correctamente
             messageElement.appendChild(tail);
 
             contentBox.appendChild(messageElement);
@@ -288,6 +328,11 @@
                 }
                 addMessage(currentUserId, message);
                 messageInput.value = '';
+
+                // Detener el indicador de escritura al enviar un mensaje
+                socket.emit('stop typing', { roomId: currentRoomId });
+                clearTimeout(typingTimer);
+                isTyping = false;
             }
         }
 

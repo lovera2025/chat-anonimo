@@ -112,7 +112,7 @@ app.post('/logout', (req, res) => {
     });
 });
 
-// --- Lógica de Socket.IO (Sin cambios) ---
+// --- Lógica de Socket.IO ---
 let liveUsers = {};
 io.on('connection', (socket) => {
     const session = socket.request.session;
@@ -182,6 +182,25 @@ io.on('connection', (socket) => {
     });
 
     socket.on('private-message', (data) => { socket.to(data.roomId).emit('private-message', data); });
+
+    // --- Lógica para el indicador de escritura ---
+    socket.on('typing', (data) => {
+        const payload = { senderId: data.senderId };
+        if (data.roomId) {
+            socket.to(data.roomId).emit('typing', payload);
+        } else {
+            socket.broadcast.emit('typing', payload);
+        }
+    });
+
+    socket.on('stop typing', (data) => {
+        if (data.roomId) {
+            socket.to(data.roomId).emit('stop typing');
+        } else {
+            socket.broadcast.emit('stop typing');
+        }
+    });
+    // --- Fin de la lógica del indicador ---
 
     socket.on('disconnect', () => {
         for (const userId in liveUsers) {
