@@ -6,12 +6,8 @@
     <title>Ayuda Anónima</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
-    <style>
-        #content-box { max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; }
-        body { min-height: 100vh; font-family: "Inter", sans-serif; }
-    </style>
 </head>
-<body class="bg-gray-900 text-gray-100 flex items-center justify-center p-4">
+<body class="bg-gray-900 text-gray-100 flex items-center justify-center min-h-screen p-4">
 
     <div id="app-container"></div>
 
@@ -29,7 +25,7 @@
                     <div class="mb-4"><label class="block text-gray-300 text-sm font-bold mb-2" for="email">Email</label><input class="shadow appearance-none border rounded w-full py-2 px-3 bg-gray-600 text-white focus:outline-none" id="email" type="email" required></div>
                     <div class="mb-6"><label class="block text-gray-300 text-sm font-bold mb-2" for="password">Contraseña</label><input class="shadow appearance-none border rounded w-full py-2 px-3 bg-gray-600 text-white mb-3 focus:outline-none" id="password" type="password" required></div>
                     <div class="flex items-center justify-between"><button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Iniciar Sesión</button><a href="javascript:showRegister()" class="inline-block align-baseline font-bold text-sm text-teal-400 hover:text-teal-200">Registrarse</a></div>
-                    <p id="form-message" class="text-xs italic mt-4"></p>
+                    <p id="form-message" class="text-red-500 text-xs italic mt-4"></p>
                 </form>
                  <div class="text-center mt-6"><a href="/" class="text-sm text-gray-400 hover:text-white">Ir al Chat Público &rarr;</a></div>
             </div>`;
@@ -64,10 +60,13 @@
                     loadApp(data.professional);
                 } else {
                     const urlParams = new URLSearchParams(window.location.search);
-                    if (window.location.pathname.startsWith('/login')) {
+                    // LÍNEA CORREGIDA: Se revisa el parámetro '?login=true' en lugar de la ruta '/login'
+                    if (urlParams.get('login') !== null) {
                         showLogin();
+                    } else if (urlParams.get('register') !== null) {
+                        showRegister();
                     } else {
-                        loadApp(null); // Carga como usuario anónimo
+                        loadApp(null); // Carga el chat público si no hay parámetros
                     }
                 }
             });
@@ -93,10 +92,9 @@
             const response = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
             const data = await response.json();
             if (response.ok) {
-                window.location.reload(); // Recarga la página para que check-session nos lleve al panel
+                window.location.href = '/'; // Recarga la página para que check-session nos lleve al panel
             } else {
                 errorP.textContent = data.message;
-                errorP.className = 'text-red-500 text-xs italic mt-4';
             }
         }
 
@@ -118,37 +116,37 @@
         }
 
         function loadApp(professional) {
-            const isAdmin = !!professional;
-            if(isAdmin) { currentUserId = professional.fullName; }
-            
             appContainer.innerHTML = chatTemplate;
-            
-            // Re-inicializamos los elementos del DOM después de cargar la plantilla
-            const mainTitle = document.getElementById('main-title');
-            const inputArea = document.getElementById('input-area');
-            const contentBox = document.getElementById('content-box');
-            const sendButton = document.getElementById('send-button');
-            const messageInput = document.getElementById('message-input');
-            
-            sendButton.addEventListener('click', sendMessage);
-            messageInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
-            
-            socket.on('connect', () => {
-                socket.emit('register-user', currentUserId);
-            });
-
-            if(isAdmin) {
-                mainTitle.textContent = `Panel de Alertas - ${professional.fullName}`;
-                inputArea.style.display = 'none';
-                contentBox.innerHTML = '<div class="text-yellow-400">Cargando historial...</div>';
-                socket.emit('admin-request-alerts');
-                setupAdminListeners();
+            const isAdmin = !!professional;
+            if (isAdmin) {
+                currentUserId = professional.fullName;
+                loadAdminPanel(professional);
             } else {
-                mainTitle.textContent = 'Ayuda Anónima';
-                contentBox.innerHTML = `<div class="text-center text-gray-400 italic">¡Bienvenido! Estás conectado como ${currentUserId}.</div>`;
+                loadUserChat();
             }
+        }
+
+        function loadUserChat() {
+            // Inicializa los elementos del DOM del chat
+            const mainTitle = document.getElementById('main-title');
+            mainTitle.textContent = 'Ayuda Anónima';
+            document.getElementById('content-box').innerHTML = `<div class="text-center text-gray-400 italic">¡Bienvenido! Estás conectado como ${currentUserId}.</div>`;
             setupChatListeners();
         }
+
+        function loadAdminPanel(professional) {
+            const mainTitle = document.getElementById('main-title');
+            const inputArea = document.getElementById('input-area');
+            mainTitle.textContent = `Panel de Alertas - ${professional.fullName}`;
+            inputArea.style.display = 'none';
+            document.getElementById('content-box').innerHTML = '<div class="text-yellow-400">Cargando historial...</div>';
+            socket.emit('admin-request-alerts');
+            setupAdminListeners();
+            setupChatListeners(); 
+        }
+        
+        // ... (el resto de tus funciones como setupAdminListeners, setupChatListeners, renderAlerts, etc. van aquí) ...
+        // ... (Pega aquí el resto de las funciones que teníamos en el archivo anterior) ...
 
         function setupAdminListeners() {
             socket.on('alert-history', renderAlerts);
@@ -164,13 +162,15 @@
         }
         
         function setupChatListeners() {
+            const sendButton = document.getElementById('send-button');
+            const messageInput = document.getElementById('message-input');
+            sendButton.addEventListener('click', sendMessage);
+            messageInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
+            
+            socket.on('connect', () => { socket.emit('register-user', currentUserId); });
             socket.on('chat message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
             socket.on('private-message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
-            socket.on('request-alert-confirmation', alertData => {
-                if (confirm("Hemos detectado que podrías estar en una situación de riesgo.\n\n¿Deseas notificar a un administrador?")) {
-                    socket.emit('alert-confirmed', alertData);
-                }
-            });
+            socket.on('request-alert-confirmation', alertData => { if (confirm("Hemos detectado que podrías estar en una situación de riesgo.\n\n¿Deseas notificar a un administrador?")) { socket.emit('alert-confirmed', alertData); } });
             socket.on('alert-queued', () => {
                 document.getElementById('input-area').style.display = 'none';
                 document.getElementById('content-box').innerHTML = '<div class="text-center text-green-400 p-4">Tu petición fue enviada. Un administrador se conectará en cualquier momento. Por favor, no cierres esta ventana.</div>';
@@ -184,23 +184,17 @@
             });
         }
 
-        function renderAlerts(alerts) { /* ... lógica para renderizar alertas ... */ }
-        function renderSingleAlert(alert, prepend = false) { /* ... lógica para renderizar una alerta ... */ }
-        function addMessage(senderId, message) { /* ... lógica para añadir un mensaje ... */ }
-        function sendMessage() { /* ... lógica para enviar un mensaje ... */ }
-
-        // Duplicamos aquí las funciones de renderizado y mensajería para que estén disponibles en el scope global
-        window.renderAlerts = function(alerts) {
+        function renderAlerts(alerts) {
             const contentBox = document.getElementById('content-box');
             contentBox.innerHTML = '';
             if (alerts.length === 0) {
                 contentBox.innerHTML = '<div id="no-alerts-msg" class="text-gray-400">No hay alertas pendientes.</div>';
                 return;
             }
-            alerts.forEach(alert => window.renderSingleAlert(alert));
+            alerts.forEach(alert => renderSingleAlert(alert));
         }
 
-        window.renderSingleAlert = function(alert, prepend = false) {
+        function renderSingleAlert(alert, prepend = false) {
             const contentBox = document.getElementById('content-box');
             const alertElement = document.createElement('div');
             alertElement.classList.add('p-3', 'mb-2', 'border-b', 'border-gray-600', 'flex', 'justify-between', 'items-center');
@@ -214,7 +208,7 @@
             if (prepend) contentBox.prepend(alertElement); else contentBox.appendChild(alertElement);
         }
 
-        window.addMessage = function(senderId, message) {
+        function addMessage(senderId, message) {
             const contentBox = document.getElementById('content-box');
             const messageElement = document.createElement('div');
             messageElement.classList.add('p-2', 'mb-2', 'rounded-lg', 'max-w-[80%]', 'break-words', 'self-start');
@@ -226,7 +220,7 @@
             contentBox.scrollTop = contentBox.scrollHeight;
         }
 
-        window.sendMessage = function() {
+        function sendMessage() {
             const messageInput = document.getElementById('message-input');
             const message = messageInput.value.trim();
             if (!message) return;
