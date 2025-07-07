@@ -6,8 +6,15 @@
     <title>Ayuda Anónima</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
+    <style>
+        #content-box { max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; }
+        #content-box::-webkit-scrollbar { width: 8px; }
+        #content-box::-webkit-scrollbar-track { background: #1a202c; border-radius: 10px; }
+        #content-box::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 10px; }
+        body { min-height: 100vh; font-family: "Inter", sans-serif; }
+    </style>
 </head>
-<body class="bg-gray-900 text-gray-100 flex items-center justify-center min-h-screen p-4">
+<body class="bg-gray-900 text-gray-100 flex items-center justify-center p-4">
 
     <div id="app-container"></div>
 
@@ -17,7 +24,7 @@
         let currentUserId = 'Usuario' + Math.floor(Math.random() * 10000);
         let currentRoomId = null;
 
-        // --- Plantillas HTML ---
+        // --- PLANTILLAS HTML ---
         const loginTemplate = `
             <div class="w-full max-w-sm bg-gray-800 rounded-lg shadow-xl p-8">
                 <h1 class="text-2xl font-bold text-center mb-6 text-teal-400">Acceso Profesional</h1>
@@ -27,7 +34,7 @@
                     <div class="flex items-center justify-between"><button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Iniciar Sesión</button><a href="javascript:showRegister()" class="inline-block align-baseline font-bold text-sm text-teal-400 hover:text-teal-200">Registrarse</a></div>
                     <p id="form-message" class="text-red-500 text-xs italic mt-4"></p>
                 </form>
-                 <div class="text-center mt-6"><a href="/" class="text-sm text-gray-400 hover:text-white">Ir al Chat Público &rarr;</a></div>
+                <div class="text-center mt-6"><a href="/" class="text-sm text-gray-400 hover:text-white">Ir al Chat Público &rarr;</a></div>
             </div>`;
 
         const registerTemplate = `
@@ -44,40 +51,42 @@
             </div>`;
 
         const chatTemplate = `
-            <div class="container mx-auto w-full max-w-lg bg-gray-800 rounded-lg shadow-xl p-6">
+            <div class="container mx-auto w-full max-w-lg bg-gray-800 rounded-lg shadow-xl p-6 relative">
+                <div id="header-container" class="absolute top-4 right-4"></div>
                 <h1 id="main-title" class="text-2xl font-bold text-center mb-6 text-teal-400"></h1>
                 <div id="content-box" class="border border-gray-700 rounded-lg p-4 mb-4 bg-gray-700 min-h-[400px] overflow-y-auto flex flex-col"></div>
                 <div id="input-area" class="flex">
                     <input type="text" id="message-input" class="flex-grow p-3 rounded-l-lg bg-gray-600 text-white focus:outline-none" placeholder="Escribe tu mensaje...">
                     <button id="send-button" class="bg-teal-500 text-white p-3 rounded-r-lg">Enviar</button>
                 </div>
+                <div id="footer-buttons" class="text-center mt-6">
+                     <button id="quick-exit-button" class="bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 focus:outline-none text-sm">Salida Rápida</button>
+                </div>
             </div>`;
 
-        // --- Lógica de Inicialización ---
+        // --- LÓGICA DE INICIALIZACIÓN ---
         window.onload = () => {
             fetch('/check-session').then(res => res.json()).then(data => {
-                if (data.loggedIn) {
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('login')) {
+                    showLogin();
+                } else if (urlParams.get('register')) {
+                    showRegister();
+                } else if (data.loggedIn) {
                     loadApp(data.professional);
                 } else {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    // LÍNEA CORREGIDA: Se revisa el parámetro '?login=true' en lugar de la ruta '/login'
-                    if (urlParams.get('login') !== null) {
-                        showLogin();
-                    } else if (urlParams.get('register') !== null) {
-                        showRegister();
-                    } else {
-                        loadApp(null); // Carga el chat público si no hay parámetros
-                    }
+                    loadApp(null);
                 }
             });
         };
 
+        // --- MANEJO DE VISTAS (LOGIN, REGISTRO, APP) ---
         function showLogin() {
             appContainer.innerHTML = loginTemplate;
             document.getElementById('login-form').addEventListener('submit', handleLogin);
             document.getElementById('register-link').addEventListener('click', (e) => { e.preventDefault(); showRegister(); });
         }
-        
+
         function showRegister() {
             appContainer.innerHTML = registerTemplate;
             document.getElementById('register-form').addEventListener('submit', handleRegister);
@@ -86,13 +95,11 @@
 
         async function handleLogin(e) {
             e.preventDefault();
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const errorP = document.getElementById('form-message');
+            const [email, password, errorP] = [document.getElementById('email').value, document.getElementById('password').value, document.getElementById('form-message')];
             const response = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
             const data = await response.json();
             if (response.ok) {
-                window.location.href = '/'; // Recarga la página para que check-session nos lleve al panel
+                window.location.href = '/';
             } else {
                 errorP.textContent = data.message;
             }
@@ -105,50 +112,74 @@
             const professionalData = { fullName: form.querySelector('#fullName').value, specialty: form.querySelector('#specialty').value, email: form.querySelector('#email').value, password: form.querySelector('#password').value };
             const response = await fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(professionalData) });
             const data = await response.json();
+            messageP.textContent = data.message;
             if (response.ok) {
                 messageP.className = 'text-green-500 text-xs italic mt-4';
-                messageP.textContent = '¡Registro exitoso! Ahora puedes iniciar sesión.';
                 form.reset();
             } else {
                 messageP.className = 'text-red-500 text-xs italic mt-4';
-                messageP.textContent = data.message;
             }
         }
 
         function loadApp(professional) {
-            appContainer.innerHTML = chatTemplate;
             const isAdmin = !!professional;
-            if (isAdmin) {
-                currentUserId = professional.fullName;
-                loadAdminPanel(professional);
-            } else {
-                loadUserChat();
-            }
+            if (isAdmin) { currentUserId = professional.fullName; }
+            
+            appContainer.innerHTML = chatTemplate;
+            setupDOMandListeners(isAdmin, professional);
         }
 
-        function loadUserChat() {
-            // Inicializa los elementos del DOM del chat
+        // --- FUNCIÓN CENTRAL DE INICIALIZACIÓN DE UI ---
+        function setupDOMandListeners(isAdmin, professional) {
+            socket.emit('register-user', currentUserId);
+            
             const mainTitle = document.getElementById('main-title');
-            mainTitle.textContent = 'Ayuda Anónima';
-            document.getElementById('content-box').innerHTML = `<div class="text-center text-gray-400 italic">¡Bienvenido! Estás conectado como ${currentUserId}.</div>`;
+            const inputArea = document.getElementById('input-area');
+            const contentBox = document.getElementById('content-box');
+            const sendButton = document.getElementById('send-button');
+            const messageInput = document.getElementById('message-input');
+            const footerButtons = document.getElementById('footer-buttons');
+            const headerContainer = document.getElementById('header-container');
+
+            sendButton.addEventListener('click', sendMessage);
+            messageInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
+            
+            if (isAdmin) {
+                mainTitle.textContent = `Panel de Alertas - ${professional.fullName}`;
+                inputArea.style.display = 'none';
+                headerContainer.innerHTML = '<button id="logout-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded text-sm">Cerrar Sesión</button>';
+                footerButtons.style.display = 'none';
+
+                document.getElementById('logout-btn').addEventListener('click', async () => {
+                    await fetch('/logout', { method: 'POST' });
+                    window.location.href = '/';
+                });
+                
+                contentBox.innerHTML = '<div class="text-yellow-400">Cargando historial...</div>';
+                socket.emit('admin-request-alerts');
+                setupAdminListeners();
+            } else {
+                mainTitle.textContent = 'Ayuda Anónima';
+                contentBox.innerHTML = `<div class="text-center text-gray-400 italic">¡Bienvenido! Estás conectado como ${currentUserId}.</div>`;
+                setupVisualFeatures();
+            }
             setupChatListeners();
         }
 
-        function loadAdminPanel(professional) {
-            const mainTitle = document.getElementById('main-title');
-            const inputArea = document.getElementById('input-area');
-            mainTitle.textContent = `Panel de Alertas - ${professional.fullName}`;
-            inputArea.style.display = 'none';
-            document.getElementById('content-box').innerHTML = '<div class="text-yellow-400">Cargando historial...</div>';
-            socket.emit('admin-request-alerts');
-            setupAdminListeners();
-            setupChatListeners(); 
-        }
-        
-        // ... (el resto de tus funciones como setupAdminListeners, setupChatListeners, renderAlerts, etc. van aquí) ...
-        // ... (Pega aquí el resto de las funciones que teníamos en el archivo anterior) ...
+        // --- LÓGICA DE SOCKETS Y RENDERIZADO ---
+        function setupAdminListeners() { /* ... */ }
+        function setupChatListeners() { /* ... */ }
+        function renderAlerts(alerts) { /* ... */ }
+        function renderSingleAlert(alert, prepend) { /* ... */ }
+        function addMessage(senderId, message) { /* ... */ }
+        function sendMessage() { /* ... */ }
 
-        function setupAdminListeners() {
+        // --- FUNCIONES VISUALES ---
+        function setupVisualFeatures() { /* ... */ }
+
+        // --- DEFINICIONES DE FUNCIONES COMPLETAS ---
+        
+        setupAdminListeners = () => {
             socket.on('alert-history', renderAlerts);
             socket.on('new-alert-in-queue', newAlert => {
                 const noAlertsMsg = document.getElementById('no-alerts-msg');
@@ -159,20 +190,15 @@
                 alert(`El usuario ${data.userId} ya no está conectado.`);
                 socket.emit('admin-request-alerts');
             });
-        }
+        };
         
-        function setupChatListeners() {
-            const sendButton = document.getElementById('send-button');
-            const messageInput = document.getElementById('message-input');
-            sendButton.addEventListener('click', sendMessage);
-            messageInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
-            
-            socket.on('connect', () => { socket.emit('register-user', currentUserId); });
+        setupChatListeners = () => {
             socket.on('chat message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
             socket.on('private-message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
             socket.on('request-alert-confirmation', alertData => { if (confirm("Hemos detectado que podrías estar en una situación de riesgo.\n\n¿Deseas notificar a un administrador?")) { socket.emit('alert-confirmed', alertData); } });
             socket.on('alert-queued', () => {
                 document.getElementById('input-area').style.display = 'none';
+                document.getElementById('footer-buttons').style.display = 'none';
                 document.getElementById('content-box').innerHTML = '<div class="text-center text-green-400 p-4">Tu petición fue enviada. Un administrador se conectará en cualquier momento. Por favor, no cierres esta ventana.</div>';
             });
             socket.on('private-session-started', data => {
@@ -182,19 +208,19 @@
                 document.getElementById('content-box').innerHTML = '';
                 addMessage('Sistema', 'Estás en una conversación privada y segura.');
             });
-        }
+        };
 
-        function renderAlerts(alerts) {
+        renderAlerts = (alerts) => {
             const contentBox = document.getElementById('content-box');
             contentBox.innerHTML = '';
             if (alerts.length === 0) {
                 contentBox.innerHTML = '<div id="no-alerts-msg" class="text-gray-400">No hay alertas pendientes.</div>';
-                return;
+            } else {
+                alerts.forEach(alert => renderSingleAlert(alert));
             }
-            alerts.forEach(alert => renderSingleAlert(alert));
-        }
+        };
 
-        function renderSingleAlert(alert, prepend = false) {
+        renderSingleAlert = (alert, prepend = false) => {
             const contentBox = document.getElementById('content-box');
             const alertElement = document.createElement('div');
             alertElement.classList.add('p-3', 'mb-2', 'border-b', 'border-gray-600', 'flex', 'justify-between', 'items-center');
@@ -206,21 +232,20 @@
                 contentBox.innerHTML = `<div class="text-yellow-400">Conectando con ${alert.userId}...</div>`;
             });
             if (prepend) contentBox.prepend(alertElement); else contentBox.appendChild(alertElement);
-        }
+        };
 
-        function addMessage(senderId, message) {
+        addMessage = (senderId, message) => {
             const contentBox = document.getElementById('content-box');
             const messageElement = document.createElement('div');
             messageElement.classList.add('p-2', 'mb-2', 'rounded-lg', 'max-w-[80%]', 'break-words', 'self-start');
-            const isMyMessage = (senderId === currentUserId);
-            if (isMyMessage) messageElement.classList.replace('self-start', 'self-end');
-            messageElement.classList.add(isMyMessage ? 'bg-blue-600' : 'bg-gray-600', 'text-white');
+            if (senderId === currentUserId) messageElement.classList.replace('self-start', 'self-end');
+            messageElement.classList.add(senderId === currentUserId ? 'bg-blue-600' : 'bg-gray-600', 'text-white');
             messageElement.innerHTML = `<strong class="text-xs opacity-75 block">${senderId}</strong>${message}`;
             contentBox.appendChild(messageElement);
             contentBox.scrollTop = contentBox.scrollHeight;
-        }
+        };
 
-        function sendMessage() {
+        sendMessage = () => {
             const messageInput = document.getElementById('message-input');
             const message = messageInput.value.trim();
             if (!message) return;
@@ -231,7 +256,18 @@
                 socket.emit('chat message', { message, senderId: currentUserId });
             }
             messageInput.value = '';
-        }
+        };
+
+        setupVisualFeatures = () => {
+            const sendButton = document.getElementById('send-button');
+            const quickExitButton = document.getElementById('quick-exit-button');
+            const headerContainer = document.getElementById('header-container');
+
+            quickExitButton.addEventListener('click', () => { window.location.href = 'https://www.google.com'; });
+            headerContainer.innerHTML = '<a href="/?login=true" class="bg-teal-600 text-white py-1 px-3 rounded-lg text-sm hover:bg-teal-700">Acceso Profesional</a>';
+            
+            // ... (resto de las funciones visuales que quieras reintegrar: emojis, partículas, botones predefinidos)
+        };
     </script>
 </body>
 </html>
