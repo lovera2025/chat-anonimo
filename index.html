@@ -109,7 +109,6 @@
 
         // --- LÓGICA DE CARGA DE LA APP ---
         function loadApp(professional) {
-            // CAMBIO: Seteamos nuestra variable global
             IS_ADMIN = !!professional;
             appContainer.innerHTML = chatTemplate;
             if (IS_ADMIN) {
@@ -149,7 +148,7 @@
                 socket.emit('admin-request-alerts');
             });
             setupAdminListeners();
-            setupCommonListeners(); // No pasamos 'true' porque IS_ADMIN ya maneja la lógica
+            setupCommonListeners();
         }
 
         // --- LISTENERS DE SOCKETS ---
@@ -189,7 +188,6 @@
                 document.getElementById('content-box').innerHTML = '';
                 addMessage('Sistema', 'Estás en una conversación privada y segura.');
 
-                // CAMBIO: Si sos admin, te agregamos el botón de emojis acá.
                 if (IS_ADMIN) {
                     setupEmojiFeature();
                 }
@@ -205,27 +203,71 @@
             }
         }
         
-        // --- FUNCIONES DE RENDERIZADO (Sin cambios) ---
-        function renderAlerts(alerts) { /* ... */ }
-        function renderSingleAlert(alert, prepend = false) { /* ... */ }
+        // --- FUNCIONES DE RENDERIZADO ---
+        function renderAlerts(alerts) {
+            const contentBox = document.getElementById('content-box');
+            contentBox.innerHTML = '';
+            if (alerts.length === 0) {
+                contentBox.innerHTML = '<div id="no-alerts-msg" class="text-gray-400">No hay alertas pendientes.</div>';
+            } else {
+                alerts.forEach(alert => renderSingleAlert(alert));
+            }
+        }
+        function renderSingleAlert(alert, prepend = false) {
+            const contentBox = document.getElementById('content-box');
+            const alertElement = document.createElement('div');
+            alertElement.id = `alert-${alert._id}`;
+            alertElement.className = 'bg-gray-700 p-3 rounded-lg mb-2 flex justify-between items-center';
+            alertElement.innerHTML = `
+                <div>
+                    <p class="font-bold text-red-400">Usuario: ${alert.userId}</p>
+                    <p class="text-sm text-gray-300 italic">"${alert.message}"</p>
+                    <p class="text-xs text-gray-500 mt-1">${new Date(alert.timestamp).toLocaleString()}</p>
+                </div>
+                <button class="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-2 rounded text-sm connect-btn">Atender</button>`;
+            alertElement.querySelector('.connect-btn').addEventListener('click', () => {
+                socket.emit('admin-connect-to-user', { alertId: alert._id, targetUserId: alert.userId });
+            });
+            if (prepend) { contentBox.insertBefore(alertElement, contentBox.firstChild); } 
+            else { contentBox.appendChild(alertElement); }
+        }
 
-        // --- FUNCIONES DE MENSAJERÍA (Sin cambios) ---
-        function addMessage(senderId, message) { /* ... */ }
-        function sendMessage() { /* ... */ }
+        // --- FUNCIONES DE MENSAJERÍA ---
+        function addMessage(senderId, message) {
+            const contentBox = document.getElementById('content-box');
+            if (!contentBox) return;
+            const messageElement = document.createElement('div');
+            const isCurrentUser = senderId === currentUserId;
+            const senderDisplay = isCurrentUser ? 'Tú' : senderId;
+            messageElement.className = `p-2 my-1 rounded-lg max-w-xs ${isCurrentUser ? 'bg-teal-600 self-end' : 'bg-gray-600 self-start'}`;
+            messageElement.innerHTML = `<div class="font-semibold text-sm">${senderDisplay}</div><div>${message}</div>`;
+            contentBox.appendChild(messageElement);
+            contentBox.scrollTop = contentBox.scrollHeight;
+        }
+        function sendMessage() {
+            const messageInput = document.getElementById('message-input');
+            const message = messageInput.value.trim();
+            if (message) {
+                const data = { senderId: currentUserId, message: message, roomId: currentRoomId };
+                if(currentRoomId) {
+                    socket.emit('private-message', data);
+                } else {
+                    socket.emit('chat message', data);
+                }
+                addMessage(currentUserId, message);
+                messageInput.value = '';
+            }
+        }
 
         // --- FUNCIONES VISUALES ---
-
-        // CAMBIO: Creamos una función solo para los emojis
         function setupEmojiFeature() {
             const sendButton = document.getElementById('send-button');
-            if (!sendButton || document.getElementById('emoji-btn')) return; // Salir si no hay botón de envío o si el de emojis ya existe
-
+            if (!sendButton || document.getElementById('emoji-btn')) return;
             const emojiButton = document.createElement('button');
             emojiButton.id = 'emoji-btn';
             emojiButton.textContent = '😊';
             emojiButton.classList.add('bg-yellow-500', 'text-white', 'p-3', 'rounded-lg', 'ml-2', 'hover:bg-yellow-600');
             sendButton.parentNode.insertBefore(emojiButton, sendButton.nextSibling);
-
             const emojiContainer = document.createElement('div');
             emojiContainer.classList.add('absolute', 'bg-gray-800', 'p-3', 'rounded-lg', 'shadow-lg', 'hidden', 'z-10');
             document.body.appendChild(emojiContainer);
@@ -258,16 +300,46 @@
         }
 
         function setupVisualFeatures() {
-            // ... (el código de setupVisualFeatures sin la parte de emojis) ...
             const quickExitButton = document.getElementById('quick-exit-button');
             const proLoginContainer = document.getElementById('professional-login-link-container');
             if (proLoginContainer) proLoginContainer.innerHTML = '<a href="/?login=true" class="text-sm text-gray-400 hover:text-teal-400">Acceso para Profesionales</a>';
             if (quickExitButton) quickExitButton.addEventListener('click', () => { window.location.href = 'https://www.google.com'; });
             
-            // ... (el resto de las features visuales) ...
-            
-            // CAMBIO: Ahora solo llamamos a la función de emojis
-            setupEmojiFeature();
+            // --- CÓDIGO MODIFICADO PARA LOS BOTONES DE ACCESO RÁPIDO ---
+            const messageInput = document.getElementById('message-input');
+
+            // Función auxiliar para crear y posicionar un botón de acceso rápido
+            const createShortcutButton = (text, positionClasses) => {
+                const button = document.createElement('button');
+                button.textContent = text;
+                // Estilos de TailwindCSS para los botones
+                button.className = `fixed ${positionClasses} bg-blue-500 text-white py-2 px-4 rounded-lg shadow-lg hover:bg-blue-600 focus:outline-none text-sm z-20`;
+                
+                // Evento de clic para enviar el mensaje
+                button.addEventListener('click', () => {
+                    if (messageInput) {
+                        // Colocamos el texto del botón en el campo de texto y lo enviamos
+                        messageInput.value = text;
+                        sendMessage();
+                    }
+                });
+
+                // Agregamos el botón al cuerpo del documento para que sea visible
+                document.body.appendChild(button);
+            };
+
+            // Creamos los tres botones con sus textos y posiciones
+            if (!IS_ADMIN) { // Nos aseguramos de que solo los usuarios normales vean estos botones
+                 createShortcutButton('Estoy sufriendo acoso', 'top-1/4 left-4');
+                 createShortcutButton('Me hacen bullying', 'top-1/4 right-4');
+                 createShortcutButton('Sufro maltrato', 'bottom-1/4 left-1/2 -translate-x-1/2');
+            }
+            // --- FIN DEL CÓDIGO MODIFICADO ---
+
+            // Emoji feature se llama condicionalmente más adelante
+            if (!IS_ADMIN) {
+                 setupEmojiFeature();
+            }
             
             const backgroundCanvas = document.getElementById('background-canvas');
             if(backgroundCanvas) {
