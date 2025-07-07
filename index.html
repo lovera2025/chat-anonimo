@@ -126,32 +126,64 @@
             setupVisualFeatures();
         }
 
+        // --- CAMBIADO ---
         function loadAdminPanel(professional) {
             socket.emit('register-user', 'ADMINISTRADOR');
             document.getElementById('main-title').textContent = `Panel de Alertas - ${professional.fullName}`;
             document.getElementById('input-area').style.display = 'none';
+
             const footerArea = document.getElementById('footer-area');
             footerArea.innerHTML = '<button id="logout-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">Cerrar Sesión</button>';
             document.getElementById('logout-btn').addEventListener('click', async () => {
                 await fetch('/logout', { method: 'POST' });
                 window.location.href = '/';
             });
-            document.getElementById('content-box').innerHTML = '<div class="text-yellow-400">Cargando historial...</div>';
+
+            // Mostramos un botón en lugar de cargar alertas automáticamente
+            const contentBox = document.getElementById('content-box');
+            contentBox.innerHTML = `<div class="flex justify-center items-center h-full">
+                                      <button id="load-alerts-btn" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-lg text-lg">
+                                        Ver Alertas Pendientes
+                                      </button>
+                                    </div>`;
+
+            // Añadimos el listener al nuevo botón
+            document.getElementById('load-alerts-btn').addEventListener('click', () => {
+                contentBox.innerHTML = '<div class="text-yellow-400">Cargando historial...</div>';
+                socket.emit('admin-request-alerts');
+            });
+
             setupAdminListeners();
             setupCommonListeners(true);
         }
 
         // --- LISTENERS DE SOCKETS ---
+        // --- CAMBIADO ---
         function setupAdminListeners() {
             socket.on('alert-history', renderAlerts);
+            
             socket.on('new-alert-in-queue', newAlert => {
                 const noAlertsMsg = document.getElementById('no-alerts-msg');
                 if (noAlertsMsg) noAlertsMsg.remove();
                 renderSingleAlert(newAlert, true);
             });
+            
             socket.on('user-disconnected-error', data => {
                 alert(`El usuario ${data.userId} ya no está conectado.`);
-                socket.emit('admin-request-alerts');
+                document.getElementById('load-alerts-btn').click(); // Simula clic para recargar
+            });
+
+            // Listener para cuando otro admin toma una alerta
+            socket.on('alert-claimed', (data) => {
+                const claimedAlertElement = document.getElementById(`alert-${data.alertId}`);
+                if (claimedAlertElement) {
+                    claimedAlertElement.remove();
+                }
+                // Si ya no quedan alertas, mostrar el mensaje.
+                const contentBox = document.getElementById('content-box');
+                if (contentBox.childElementCount === 0) {
+                     contentBox.innerHTML = '<div id="no-alerts-msg" class="text-gray-400">No hay alertas pendientes.</div>';
+                }
             });
         }
         
@@ -195,18 +227,25 @@
             alerts.forEach(alert => renderSingleAlert(alert));
         }
 
+        // --- CAMBIADO ---
         function renderSingleAlert(alert, prepend = false) {
             const contentBox = document.getElementById('content-box');
             const alertElement = document.createElement('div');
+            alertElement.id = `alert-${alert._id}`; // ID único para cada alerta
             alertElement.classList.add('p-3', 'mb-2', 'border-b', 'border-gray-600', 'flex', 'justify-between', 'items-center');
+            
             const date = new Date(alert.timestamp);
             const formattedDate = `${date.toLocaleDateString('es-AR')} ${date.toLocaleTimeString('es-AR')}`;
+            
             alertElement.innerHTML = `<div><p class="text-white font-bold">"${alert.message}"</p><p class="text-xs text-gray-400 mt-1">De: ${alert.userId} | ${formattedDate}</p></div><button class="connect-btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Conectar</button>`;
+            
             alertElement.querySelector('.connect-btn').addEventListener('click', () => {
                 socket.emit('admin-connect-to-user', { alertId: alert._id, targetUserId: alert.userId });
                 contentBox.innerHTML = `<div class="text-yellow-400">Conectando con ${alert.userId}...</div>`;
             });
-            if (prepend) contentBox.prepend(alertElement); else contentBox.appendChild(alertElement);
+
+            if (prepend) contentBox.prepend(alertElement); 
+            else contentBox.appendChild(alertElement);
         }
 
         // --- FUNCIONES DE MENSAJERÍA ---
@@ -235,7 +274,7 @@
             messageInput.value = '';
         }
 
-        // --- FUNCIONES VISUALES (REINTEGRADAS) ---
+        // --- FUNCIONES VISUALES ---
         function setupVisualFeatures() {
             const sendButton = document.getElementById('send-button');
             const quickExitButton = document.getElementById('quick-exit-button');
@@ -316,27 +355,21 @@
         // --- INICIALIZACIÓN DEL SCRIPT ---
         async function initialize() {
             try {
-                // Verificamos si hay un profesional logueado en el backend
                 const response = await fetch('/check-session');
                 const data = await response.json();
                 
-                // Verificamos si la URL indica que se quiere hacer login (ej: /?login=true)
                 const urlParams = new URLSearchParams(window.location.search);
                 const isLoginPage = urlParams.get('login') === 'true';
 
                 if (data.loggedIn) {
-                    // Si hay una sesión activa, cargamos la app en modo profesional/admin
                     loadApp(data.professional);
                 } else if (isLoginPage) {
-                    // Si no hay sesión pero se quiere ir al login, mostramos el formulario
                     showLogin();
                 } else {
-                    // Si no, es un usuario normal en el chat público
                     loadApp(null);
                 }
             } catch (error) {
                 console.error("Error al inicializar la app:", error);
-                // Si hay un error, mostramos el chat por defecto para que no se quede en blanco
                 loadApp(null);
             }
         }

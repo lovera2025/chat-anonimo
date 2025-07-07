@@ -107,6 +107,7 @@ io.on('connection', (socket) => {
     if (session && session.professional) {
         console.log(`Un profesional (${session.professional.fullName}) se ha conectado: ${socket.id}`);
         adminSockets.push(socket.id);
+        socket.join('admin-room'); // <-- CAMBIO 1: El profesional se une a la sala de admins
         socket.emit('admin-welcome', session.professional);
     } else {
         console.log(`Un usuario se ha conectado: ${socket.id}`);
@@ -172,6 +173,9 @@ io.on('connection', (socket) => {
             userSocket.join(privateRoomId);
             await db.collection('alerts').updateOne({ _id: new ObjectId(alertId) }, { $set: { status: 'activa', attendedBy: session.professional.fullName } });
             
+            // <-- CAMBIO 2: Avisa a los otros admins en la sala que la alerta fue tomada
+            socket.to('admin-room').emit('alert-claimed', { alertId: alertId });
+
             adminSocket.emit('private-session-started', { roomId: privateRoomId, user: targetUserId });
             userSocket.emit('private-session-started', { roomId: privateRoomId, user: session.professional.fullName });
         } else {
