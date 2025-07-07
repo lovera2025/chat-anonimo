@@ -7,17 +7,15 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        /* La altura del body y el scroll suave se mantienen, son buenas prácticas. */
-        #content-box { 
-            display: flex; 
-            flex-direction: column; 
-            scroll-behavior: smooth; 
+        #content-box {
+            display: flex;
+            flex-direction: column;
+            scroll-behavior: smooth;
         }
-        body { 
-            font-family: "Inter", sans-serif; 
+        body {
+            font-family: "Inter", sans-serif;
         }
 
-        /* La animación de los mensajes es un gran detalle, la conservamos. */
         @keyframes fadeInUp {
             from {
                 opacity: 0;
@@ -31,11 +29,16 @@
         .message-bubble {
             animation: fadeInUp 0.3s ease-out;
         }
+        /* Estilos para el contenedor de alertas con scroll */
+        .alerts-container {
+            max-height: 60vh; /* Altura máxima antes de que aparezca el scroll */
+            overflow-y: auto; /* Scroll vertical si el contenido excede la altura */
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 flex items-center justify-center min-h-screen p-2 sm:p-4">
 
-    <div id="app-container" class="w-full mt-10 md:mt-0"></div>
+    <div id="app-container" class="w-full mt-10 md:mt-0 flex justify-center"></div>
     <canvas id="background-canvas" class="fixed top-0 left-0 w-full h-full -z-10"></canvas>
 
     <script>
@@ -72,12 +75,12 @@
             </div>`;
 
         const chatTemplate = `
-            <div class="container mx-auto w-full max-w-lg bg-gray-800 rounded-lg shadow-xl p-4 sm:p-6 relative flex flex-col h-[90vh] sm:h-auto">
+            <div class="container mx-auto w-full max-w-lg bg-gray-800 rounded-lg shadow-xl p-4 sm:p-6 relative flex flex-col h-[90vh] sm:h-[85vh]">
                 <div id="header-container" class="absolute top-4 right-4 flex gap-2 items-center"></div>
                 <h1 id="main-title" class="text-xl sm:text-2xl font-bold text-center mb-4 text-teal-400"></h1>
-                
+
                 <div id="content-box" class="border border-gray-700 rounded-lg p-4 mb-4 bg-gray-700 flex-grow overflow-y-auto min-h-0"></div>
-                
+
                 <div id="typing-indicator" class="text-gray-400 italic text-sm h-5 mb-1 px-1"></div>
 
                 <div id="input-area" class="flex">
@@ -88,9 +91,8 @@
                      <button id="quick-exit-button" class="bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 focus:outline-none text-sm transition-transform duration-200 ease-in-out hover:scale-105">Salida Rápida</button>
                      <div id="professional-login-link-container"></div>
                 </div>
+                 <p id="help-notice-mobile" class="hidden text-center mt-3 px-3 py-1 text-gray-300 text-xs"></p>
             </div>`;
-        
-        // --- El resto del script de JS se mantiene igual, con excepción de la función setupVisualFeatures ---
 
         // --- MANEJO DE VISTAS ---
         function showLogin() {
@@ -103,17 +105,17 @@
             document.getElementById('register-form').addEventListener('submit', handleRegister);
             document.getElementById('login-link').addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
         }
-        
+
         // --- MANEJO DE FORMULARIOS ---
         async function handleLogin(e) {
-            e.preventDefault(); 
+            e.preventDefault();
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const errorP = document.getElementById('form-message');
             try {
                 const response = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
                 const data = await response.json();
-                if (response.ok) { window.location.href = '/'; } 
+                if (response.ok) { window.location.href = '/'; }
                 else { errorP.textContent = data.message; }
             } catch (err) { errorP.textContent = 'Error de conexión.'; }
         }
@@ -159,7 +161,7 @@
             socket.emit('register-user', 'ADMINISTRADOR');
             document.getElementById('main-title').textContent = `Panel de Alertas - ${professional.fullName}`;
             document.getElementById('input-area').style.display = 'none';
-            document.getElementById('typing-indicator').style.display = 'none'; // Ocultar para admin
+            document.getElementById('typing-indicator').style.display = 'none';
             const footerArea = document.getElementById('footer-area');
             footerArea.innerHTML = '<button id="logout-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition-transform duration-200 ease-in-out hover:scale-105">Cerrar Sesión</button>';
             document.getElementById('logout-btn').addEventListener('click', async () => {
@@ -201,18 +203,17 @@
                 }
             });
         }
-        
+
         function setupCommonListeners() {
             const sendButton = document.getElementById('send-button');
             const messageInput = document.getElementById('message-input');
-            
+
             if(sendButton && messageInput) {
                 sendButton.addEventListener('click', sendMessage);
                 messageInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
             }
 
-            // --- INICIO: LÓGICA DEL INDICADOR DE ESCRITURA ---
-            let typingTimer; 
+            let typingTimer;
             const TYPING_TIMER_LENGTH = 1500;
             let isTyping = false;
 
@@ -245,10 +246,9 @@
                     typingIndicator.textContent = '';
                 }
             });
-            // --- FIN: LÓGICA DEL INDICADOR DE ESCRITURA ---
 
             socket.on('private-message', data => { if (data.senderId !== currentUserId) addMessage(data.senderId, data.message); });
-            
+
             socket.on('private-session-started', data => {
                 currentRoomId = data.roomId;
                 document.getElementById('main-title').textContent = `Sesión Privada con ${data.user}`;
@@ -272,17 +272,20 @@
                 });
             }
         }
-        
+
         // --- FUNCIONES DE RENDERIZADO ---
         function renderAlerts(alerts) {
             const contentBox = document.getElementById('content-box');
-            contentBox.innerHTML = '';
+            contentBox.innerHTML = ''; // Limpiar el contenido anterior
+            contentBox.classList.add('alerts-container'); // Añadir clase para el scroll
+
             if (alerts.length === 0) {
                 contentBox.innerHTML = '<div id="no-alerts-msg" class="text-gray-400">No hay alertas pendientes.</div>';
             } else {
                 alerts.forEach(alert => renderSingleAlert(alert));
             }
         }
+
         function renderSingleAlert(alert, prepend = false) {
             const contentBox = document.getElementById('content-box');
             const alertElement = document.createElement('div');
@@ -298,7 +301,8 @@
             alertElement.querySelector('.connect-btn').addEventListener('click', () => {
                 socket.emit('admin-connect-to-user', { alertId: alert._id, targetUserId: alert.userId });
             });
-            if (prepend) { contentBox.insertBefore(alertElement, contentBox.firstChild); } 
+
+            if (prepend) { contentBox.insertBefore(alertElement, contentBox.firstChild); }
             else { contentBox.appendChild(alertElement); }
         }
 
@@ -311,7 +315,7 @@
             const senderDisplay = isCurrentUser ? 'Tú' : senderId;
 
             messageElement.className = `message-bubble p-2 my-1 rounded-lg max-w-xs relative ${isCurrentUser ? 'bg-teal-600 self-end' : 'bg-gray-600 self-start'}`;
-            
+
             messageElement.innerHTML = `<div class="font-semibold text-sm">${senderDisplay}</div><div>${message}</div>`;
 
             const tail = document.createElement('div');
@@ -340,10 +344,10 @@
                 messageInput.value = '';
 
                 socket.emit('stop typing', { roomId: currentRoomId });
-                clearTimeout(typingTimer);
-                isTyping = false;
+                // No es necesario limpiar el timer aquí, ya se hace en el input event
             }
         }
+
 
         // --- FUNCIONES VISUALES ---
         function setupEmojiFeature() {
@@ -362,26 +366,26 @@
                 const emojiOption = document.createElement('button');
                 emojiOption.textContent = emoji;
                 emojiOption.classList.add('text-xl', 'p-2', 'hover:bg-gray-700', 'rounded');
-                emojiOption.addEventListener('click', () => { 
-                    document.getElementById('message-input').value += emoji; 
-                    emojiContainer.style.display = 'none'; 
+                emojiOption.addEventListener('click', () => {
+                    document.getElementById('message-input').value += emoji;
+                    emojiContainer.style.display = 'none';
                 });
                 emojiContainer.appendChild(emojiOption);
             });
             emojiButton.addEventListener('click', (e) => {
                 const isHidden = emojiContainer.style.display === 'none' || emojiContainer.style.display === '';
                 emojiContainer.style.display = isHidden ? 'block' : 'none';
-                if (isHidden) { 
-                    const rect = emojiButton.getBoundingClientRect(); 
-                    emojiContainer.style.top = `${rect.bottom + window.scrollY}px`; 
-                    emojiContainer.style.left = 'auto'; 
-                    emojiContainer.style.right = `${window.innerWidth - rect.right}px`; 
+                if (isHidden) {
+                    const rect = emojiButton.getBoundingClientRect();
+                    emojiContainer.style.top = `${rect.bottom + window.scrollY}px`;
+                    emojiContainer.style.left = 'auto';
+                    emojiContainer.style.right = `${window.innerWidth - rect.right}px`;
                 }
             });
-            document.body.addEventListener('click', (e) => { 
-                if (emojiContainer && !emojiContainer.contains(e.target) && e.target !== emojiButton) { 
-                    emojiContainer.style.display = 'none'; 
-                } 
+            document.body.addEventListener('click', (e) => {
+                if (emojiContainer && !emojiContainer.contains(e.target) && e.target !== emojiButton) {
+                    emojiContainer.style.display = 'none';
+                }
             });
         }
 
@@ -396,9 +400,8 @@
             const createShortcutButton = (text, positionClasses) => {
                 const button = document.createElement('button');
                 button.textContent = text;
-                // CAMBIO 6: Ocultar botones de acceso rápido en móviles.
                 button.className = `hidden md:block fixed ${positionClasses} bg-teal-600 text-white py-2 px-4 rounded-lg shadow-lg hover:bg-teal-700 focus:outline-none text-sm z-20 transition-transform duration-200 ease-in-out hover:scale-105`;
-                
+
                 button.addEventListener('click', () => {
                     if (messageInput) {
                         messageInput.value = text;
@@ -409,19 +412,28 @@
             };
 
             if (!IS_ADMIN) {
-                const helpNotice = document.createElement('p');
-                helpNotice.textContent = 'Comunicate al 102 o 137 si sufris acoso, maltrato o bullying.';
-                // CAMBIO 7: Adaptar el aviso para que sea más pequeño y no moleste en móviles.
-                helpNotice.className = 'fixed top-2 left-1/2 -translate-x-1/2 bg-gray-900 bg-opacity-80 px-3 py-1 rounded-full text-gray-300 text-xs sm:text-sm z-20';
-                document.body.appendChild(helpNotice);
+                const helpText = 'Comunicate al 102 o 137 si sufris acoso, maltrato o bullying.';
+                // Aviso para pantallas grandes (arriba)
+                const helpNoticeDesktop = document.createElement('p');
+                helpNoticeDesktop.textContent = helpText;
+                helpNoticeDesktop.className = 'hidden sm:block fixed top-2 left-1/2 -translate-x-1/2 bg-gray-900 bg-opacity-80 px-3 py-1 rounded-full text-gray-300 text-sm z-20';
+                document.body.appendChild(helpNoticeDesktop);
+
+                // Aviso para móviles (abajo)
+                const helpNoticeMobile = document.getElementById('help-notice-mobile');
+                if (helpNoticeMobile) {
+                    helpNoticeMobile.textContent = helpText;
+                    helpNoticeMobile.className = 'sm:hidden text-center mt-3 px-3 py-1 text-gray-300 text-xs';
+                }
+
 
                 createShortcutButton('Estoy sufriendo acoso', 'top-1/2 -translate-y-1/2 left-4');
                 createShortcutButton('Me hacen bullying', 'top-1/2 -translate-y-1/2 right-4');
                 createShortcutButton('Sufro maltrato', 'bottom-10 left-1/2 -translate-x-1/2');
-                
+
                 setupEmojiFeature();
             }
-            
+
             const backgroundCanvas = document.getElementById('background-canvas');
             if(backgroundCanvas) {
                 const ctx = backgroundCanvas.getContext('2d');
@@ -468,7 +480,7 @@
                 loadApp(null);
             }
         }
-        
+
         initialize();
 
     </script>
